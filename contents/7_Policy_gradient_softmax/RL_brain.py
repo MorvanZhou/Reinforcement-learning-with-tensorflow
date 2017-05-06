@@ -4,7 +4,7 @@ All decisions are made in here.
 
 Policy Gradient, Reinforcement Learning.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

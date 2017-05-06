@@ -2,7 +2,7 @@
 Double DQN & Natural DQN comparison,
 The Pendulum example.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

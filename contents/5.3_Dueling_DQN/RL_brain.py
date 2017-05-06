@@ -1,7 +1,7 @@
 """
 The Dueling DQN based on this paper: https://arxiv.org/abs/1511.06581
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

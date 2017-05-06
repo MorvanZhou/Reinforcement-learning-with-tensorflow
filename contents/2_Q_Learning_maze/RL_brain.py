@@ -2,7 +2,7 @@
 This part of code is the Q learning brain, which is a brain of the agent.
 All decisions are made in here.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
 import numpy as np

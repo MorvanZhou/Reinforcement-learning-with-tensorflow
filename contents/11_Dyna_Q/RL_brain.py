@@ -2,7 +2,7 @@
 This part of code is the Dyna-Q learning brain, which is a brain of the agent.
 All decisions and learning processes are made in here.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
 import numpy as np

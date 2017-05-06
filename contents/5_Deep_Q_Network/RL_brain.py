@@ -3,7 +3,7 @@ This part of code is the DQN brain, which is a brain of the agent.
 All decisions are made in here.
 Using Tensorflow to build the neural network.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

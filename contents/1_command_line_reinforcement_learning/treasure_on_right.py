@@ -3,7 +3,7 @@ A simple example for Reinforcement Learning using table lookup Q-learning method
 An agent "o" is on the left of a 1 dimensional world, the treasure is on the rightmost location.
 Run this program and to see how the agent will improve its strategy of finding the treasure.
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
 import numpy as np

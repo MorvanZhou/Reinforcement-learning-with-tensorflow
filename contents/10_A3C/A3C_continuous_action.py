@@ -3,7 +3,7 @@ Asynchronous Advantage Actor Critic (A3C) with continuous action space, Reinforc
 
 The Pendulum example.
 
-View more on [莫烦Python] : https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 tensorflow 1.0

@@ -1,7 +1,7 @@
 """
 The double DQN based on this paper: https://arxiv.org/abs/1509.06461
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

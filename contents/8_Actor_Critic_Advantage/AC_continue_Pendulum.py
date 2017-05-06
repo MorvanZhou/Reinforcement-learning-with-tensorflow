@@ -5,7 +5,7 @@ The Pendulum example (based on https://github.com/dennybritz/reinforcement-learn
 
 Cannot converge!!! oscillate!!!
 
-View more on [莫烦Python] : https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 tensorflow 1.0

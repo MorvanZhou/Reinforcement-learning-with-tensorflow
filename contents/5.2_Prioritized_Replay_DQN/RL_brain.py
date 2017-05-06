@@ -1,7 +1,7 @@
 """
 The DQN improvement: Prioritized Experience Replay (based on https://arxiv.org/abs/1511.05952)
 
-View more on 莫烦Python: https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 Tensorflow: 1.0

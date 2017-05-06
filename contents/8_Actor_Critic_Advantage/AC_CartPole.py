@@ -3,7 +3,7 @@ Actor-Critic using TD-error as the Advantage, Reinforcement Learning.
 
 The cart pole example. Policy is oscillated.
 
-View more on [莫烦Python] : https://morvanzhou.github.io/tutorials/
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
 tensorflow 1.0
