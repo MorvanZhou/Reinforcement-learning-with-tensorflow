@@ -16,6 +16,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
 
 **As many requests about making these tutorials available in English, please find them in this playlist:** ([https://www.youtube.com/playlist?list=PLXO45tsB95cIplu-fLMpUEEZTwrDNh6Ba](https://www.youtube.com/playlist?list=PLXO45tsB95cIplu-fLMpUEEZTwrDNh6Ba))
 
+# Table of Contents
 
 * [Simple entry example](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/1_command_line_reinforcement_learning)
 * Tabular Methods
