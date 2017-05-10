@@ -96,7 +96,8 @@ class DeepQNetwork:
             self.q_next = build_layers(self.s_, c_names, n_l1, w_initializer, b_initializer)
 
         with tf.variable_scope('q_target'):
-            self.q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')    # shape=(None, )
+            q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')    # shape=(None, )
+            self.q_target = tf.stop_gradient(q_target)
 
         with tf.variable_scope('q_eval'):
             a_one_hot = tf.one_hot(self.a, depth=self.n_actions, dtype=tf.float32)
