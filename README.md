@@ -33,6 +33,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
 * [A3C](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/10_A3C)
 * [Dyna-Q](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/11_Dyna_Q)
 
+### [Some of my experients](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments)
 
 # Donation
 
