@@ -1,12 +1,3 @@
-"""
-Sarsa is a online updating method for Reinforcement learning.
-
-Unlike Q learning which is a offline updating method, Sarsa is updating while in the current trajectory.
-
-You will see the sarsa is more coward when punishment is close because it cares about all behaviours,
-while q learning is more brave because it only cares about maximum behaviour.
-"""
-
 from maze_env import Maze
 from RL_brain import DeepQNetwork
 
