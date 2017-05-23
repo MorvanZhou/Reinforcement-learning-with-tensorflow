@@ -102,14 +102,16 @@ class Memory(object):   # stored as ( s, a, r, s_ ) in SumTree
     alpha = 0.6     # [0~1] convert the importance of TD error to priority
     beta = 0.4      # importance-sampling, from initial value increasing to 1
     beta_increment_per_sampling = 0.001
-    abs_err_upper = 1  # clipped abs error
+    abs_err_upper = 1.  # clipped abs error
 
     def __init__(self, capacity):
         self.tree = SumTree(capacity)
 
-    def store(self, error, transition):
-        p = self._get_priority(error)
-        self.tree.add_new_priority(p, transition)
+    def store(self, transition):
+        max_p = np.max(self.tree.tree[-self.tree.capacity:])
+        if max_p == 0:
+            max_p = self.abs_err_upper
+        self.tree.add_new_priority(max_p, transition)   # set the max p for new p
 
     def sample(self, n):
         batch_idx, batch_memory, ISWeights = [], [], []
@@ -234,8 +236,7 @@ class DQNPrioritizedReplay:
     def store_transition(self, s, a, r, s_):
         if self.prioritized:    # prioritized replay
             transition = np.hstack((s, [a, r], s_))
-            max_p = np.max(self.memory.tree.tree[-self.memory.tree.capacity:])   # have high priority for newly arrived transition
-            self.memory.store(max_p, transition)
+            self.memory.store(transition)    # have high priority for newly arrived transition
         else:       # random replay
             if not hasattr(self, 'memory_counter'):
                 self.memory_counter = 0
