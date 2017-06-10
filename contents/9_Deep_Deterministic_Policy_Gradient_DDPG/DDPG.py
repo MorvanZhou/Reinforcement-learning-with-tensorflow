@@ -224,7 +224,7 @@ for i in range(MAX_EPISODES):
         if RENDER:
             env.render()
 
-        # Added exploration noise
+        # Add exploration noise
         a = actor.choose_action(s)
         a = np.clip(np.random.normal(a, var), -2, 2)    # add randomness to action selection for exploration
         s_, r, done, info = env.step(a)
