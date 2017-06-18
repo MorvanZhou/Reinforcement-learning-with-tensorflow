@@ -60,7 +60,7 @@ https://conda.io/docs/installation.html
 
 
 **Conda Cheat Sheet**
-https://gist.github.com/florentpietot/4eb598a8aac93834d4ca010a5f4a4412
+https://conda.io/docs/_downloads/conda-cheatsheet.pdf
 
 
 ```
