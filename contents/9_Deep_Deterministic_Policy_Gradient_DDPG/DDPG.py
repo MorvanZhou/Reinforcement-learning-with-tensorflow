@@ -69,8 +69,8 @@ class Actor(object):
                 scaled_a = tf.multiply(actions, self.action_bound, name='scaled_a')  # Scale output to -action_bound to action_bound
         return scaled_a
 
-    def learn(self, s, a):   # batch update
-        self.sess.run(self.train_op, feed_dict={S: s, A: a})
+    def learn(self, s):   # batch update
+        self.sess.run(self.train_op, feed_dict={S: s})
         # the following method for soft replace target params is computational expansive
         # target_params = (1-tau) * target_params + tau * eval_params
         # self.sess.run([tf.assign(t, (1 - self.tau) * t + self.tau * e) for t, e in zip(self.t_params, self.e_params)])
@@ -93,14 +93,14 @@ class Actor(object):
             self.policy_grads = tf.gradients(ys=self.a, xs=self.e_params, grad_ys=a_grads)
 
         with tf.variable_scope('A_train'):
-            opt = tf.train.AdamOptimizer(-self.lr / BATCH_SIZE)  # (- learning rate) for ascent policy, div to take mean
+            opt = tf.train.AdamOptimizer(-self.lr)  # (- learning rate) for ascent policy
             self.train_op = opt.apply_gradients(zip(self.policy_grads, self.e_params))
 
 
 ###############################  Critic  ####################################
 
 class Critic(object):
-    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, t_replace_iter, a_):
+    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, t_replace_iter, a, a_):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
@@ -111,7 +111,8 @@ class Critic(object):
 
         with tf.variable_scope('Critic'):
             # Input (s, a), output q
-            self.q = self._build_net(S, A, 'eval_net', trainable=True)
+            self.a = a
+            self.q = self._build_net(S, self.a, 'eval_net', trainable=True)
 
             # Input (s_, a_), output q_ for q_target
             self.q_ = self._build_net(S_, a_, 'target_net', trainable=False)    # target_q is based on a_ from Actor's target_net
@@ -129,7 +130,7 @@ class Critic(object):
             self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
         with tf.variable_scope('a_grad'):
-            self.a_grads = tf.gradients(self.q, A)[0]   # tensor of gradients of each sample (None, a_dim)
+            self.a_grads = tf.gradients(self.q, a)[0]   # tensor of gradients of each sample (None, a_dim)
 
     def _build_net(self, s, a, scope, trainable):
         with tf.variable_scope(scope):
@@ -148,7 +149,7 @@ class Critic(object):
         return q
 
     def learn(self, s, a, r, s_):
-        self.sess.run(self.train_op, feed_dict={S: s, A: a, R: r, S_: s_})
+        self.sess.run(self.train_op, feed_dict={S: s, self.a: a, R: r, S_: s_})
         # the following method for soft replace target params is computational expansive
         # target_params = (1-tau) * target_params + tau * eval_params
         # self.sess.run([tf.assign(t, (1 - self.tau) * t + self.tau * e) for t, e in zip(self.t_params, self.e_params)])
@@ -190,8 +191,6 @@ action_bound = env.action_space.high
 # all placeholder for tf
 with tf.name_scope('S'):
     S = tf.placeholder(tf.float32, shape=[None, state_dim], name='s')
-with tf.name_scope('A'):
-    A = tf.placeholder(tf.float32, shape=[None, action_dim], name='a')
 with tf.name_scope('R'):
     R = tf.placeholder(tf.float32, [None, 1], name='r')
 with tf.name_scope('S_'):
@@ -203,7 +202,7 @@ sess = tf.Session()
 # Create actor and critic.
 # They are actually connected to each other, details can be seen in tensorboard or in this picture:
 actor = Actor(sess, action_dim, action_bound, LR_A, REPLACE_ITER_A)
-critic = Critic(sess, state_dim, action_dim, LR_C, GAMMA, REPLACE_ITER_C, actor.a_)
+critic = Critic(sess, state_dim, action_dim, LR_C, GAMMA, REPLACE_ITER_C, actor.a, actor.a_)
 actor.add_grad_to_graph(critic.a_grads)
 
 sess.run(tf.global_variables_initializer())
@@ -240,7 +239,7 @@ for i in range(MAX_EPISODES):
             b_s_ = b_M[:, -state_dim:]
 
             critic.learn(b_s, b_a, b_r, b_s_)
-            actor.learn(b_s, b_a)
+            actor.learn(b_s)
 
         s = s_
         ep_reward += r
