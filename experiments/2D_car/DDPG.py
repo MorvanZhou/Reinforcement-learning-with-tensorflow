@@ -27,14 +27,14 @@ from car_env import CarEnv
 np.random.seed(1)
 tf.set_random_seed(1)
 
-MAX_EPISODES = 225
+MAX_EPISODES = 500
 MAX_EP_STEPS = 600
-LR_A = 1e-3  # learning rate for actor
-LR_C = 1e-3  # learning rate for critic
-GAMMA = 0.95  # reward discount
+LR_A = 1e-4  # learning rate for actor
+LR_C = 1e-4  # learning rate for critic
+GAMMA = 0.9  # reward discount
 REPLACE_ITER_A = 800
 REPLACE_ITER_C = 700
-MEMORY_CAPACITY = 5000
+MEMORY_CAPACITY = 2000
 BATCH_SIZE = 16
 VAR_MIN = 0.1
 RENDER = True
@@ -49,8 +49,6 @@ ACTION_BOUND = env.action_bound
 # all placeholder for tf
 with tf.name_scope('S'):
     S = tf.placeholder(tf.float32, shape=[None, STATE_DIM], name='s')
-with tf.name_scope('A'):
-    A = tf.placeholder(tf.float32, shape=[None, ACTION_DIM], name='a')
 with tf.name_scope('R'):
     R = tf.placeholder(tf.float32, [None, 1], name='r')
 with tf.name_scope('S_'):
@@ -92,8 +90,8 @@ class Actor(object):
                 scaled_a = tf.multiply(actions, self.action_bound, name='scaled_a')  # Scale output to -action_bound to action_bound
         return scaled_a
 
-    def learn(self, s, a):   # batch update
-        self.sess.run(self.train_op, feed_dict={S: s, A: a})
+    def learn(self, s):   # batch update
+        self.sess.run(self.train_op, feed_dict={S: s})
         if self.t_replace_counter % self.t_replace_iter == 0:
             self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
         self.t_replace_counter += 1
@@ -107,12 +105,12 @@ class Actor(object):
             self.policy_grads = tf.gradients(ys=self.a, xs=self.e_params, grad_ys=a_grads)
 
         with tf.variable_scope('A_train'):
-            opt = tf.train.RMSPropOptimizer(-self.lr / BATCH_SIZE)  # (- learning rate) for ascent policy, div to take mean
+            opt = tf.train.RMSPropOptimizer(-self.lr)  # (- learning rate) for ascent policy
             self.train_op = opt.apply_gradients(zip(self.policy_grads, self.e_params))
 
 
 class Critic(object):
-    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, t_replace_iter, a_):
+    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, t_replace_iter, a, a_):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
@@ -123,7 +121,8 @@ class Critic(object):
 
         with tf.variable_scope('Critic'):
             # Input (s, a), output q
-            self.q = self._build_net(S, A, 'eval_net', trainable=True)
+            self.a = a
+            self.q = self._build_net(S, self.a, 'eval_net', trainable=True)
 
             # Input (s_, a_), output q_ for q_target
             self.q_ = self._build_net(S_, a_, 'target_net', trainable=False)    # target_q is based on a_ from Actor's target_net
@@ -141,7 +140,7 @@ class Critic(object):
             self.train_op = tf.train.RMSPropOptimizer(self.lr).minimize(self.loss)
 
         with tf.variable_scope('a_grad'):
-            self.a_grads = tf.gradients(self.q, A)[0]   # tensor of gradients of each sample (None, a_dim)
+            self.a_grads = tf.gradients(self.q, a)[0]   # tensor of gradients of each sample (None, a_dim)
 
     def _build_net(self, s, a, scope, trainable):
         with tf.variable_scope(scope):
@@ -162,7 +161,7 @@ class Critic(object):
         return q
 
     def learn(self, s, a, r, s_):
-        self.sess.run(self.train_op, feed_dict={S: s, A: a, R: r, S_: s_})
+        self.sess.run(self.train_op, feed_dict={S: s, self.a: a, R: r, S_: s_})
         if self.t_replace_counter % self.t_replace_iter == 0:
             self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
         self.t_replace_counter += 1
@@ -190,7 +189,7 @@ sess = tf.Session()
 
 # Create actor and critic.
 actor = Actor(sess, ACTION_DIM, ACTION_BOUND[1], LR_A, REPLACE_ITER_A)
-critic = Critic(sess, STATE_DIM, ACTION_DIM, LR_C, GAMMA, REPLACE_ITER_C, actor.a_)
+critic = Critic(sess, STATE_DIM, ACTION_DIM, LR_C, GAMMA, REPLACE_ITER_C, actor.a, actor.a_)
 actor.add_grad_to_graph(critic.a_grads)
 
 M = Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
@@ -230,7 +229,7 @@ def train():
                 b_s_ = b_M[:, -STATE_DIM:]
 
                 critic.learn(b_s, b_a, b_r, b_s_)
-                actor.learn(b_s, b_a)
+                actor.learn(b_s)
 
             s = s_
             ep_step += 1
