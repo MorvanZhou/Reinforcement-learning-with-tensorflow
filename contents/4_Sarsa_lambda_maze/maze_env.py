@@ -14,9 +14,14 @@ View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 
 import numpy as np
-np.random.seed(1)
-import tkinter as tk
 import time
+import sys
+if sys.version_info.major == 2:
+    import Tkinter as tk
+else:
+    import tkinter as tk
+
+np.random.seed(1)
 
 
 UNIT = 40   # pixels

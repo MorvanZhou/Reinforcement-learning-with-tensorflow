@@ -13,10 +13,14 @@ View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 
 import numpy as np
-np.random.seed(1)
-import tkinter as tk
 import time
+import sys
+if sys.version_info.major == 2:
+    import Tkinter as tk
+else:
+    import tkinter as tk
 
+np.random.seed(1)
 
 UNIT = 40   # pixels
 MAZE_H = 4  # grid height
@@ -127,3 +131,17 @@ class Maze(tk.Tk, object):
         self.update()
 
 
+def update():
+    for t in range(10):
+        s = env.reset()
+        while True:
+            env.render()
+            a = 1
+            s, r, done = env.step(a)
+            if done:
+                break
+
+if __name__ == '__main__':
+    env = Maze()
+    env.after(100, update)
+    env.mainloop()
