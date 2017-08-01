@@ -11,8 +11,6 @@ The RL is in RL_brain.py.
 
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
-
-
 import numpy as np
 import time
 import sys
@@ -26,7 +24,7 @@ MAZE_H = 4  # grid height
 MAZE_W = 4  # grid width
 
 
-class Maze(tk.Tk):
+class Maze(tk.Tk, object):
     def __init__(self):
         super(Maze, self).__init__()
         self.action_space = ['u', 'd', 'l', 'r']
