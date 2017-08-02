@@ -14,9 +14,6 @@ import tensorflow as tf
 import numpy as np
 import gym
 
-np.random.seed(1)
-tf.set_random_seed(1)
-
 #####################  hyper parameters  ####################
 
 MAX_EPISODES = 70
@@ -32,8 +29,7 @@ BATCH_SIZE = 32
 RENDER = False
 ENV_NAME = 'Pendulum-v0'
 
-###############################  Actor  ####################################
-
+###############################  DDPG  ####################################
 
 class DDPG(object):
     def __init__(self, a_dim, s_dim, a_bound,):
@@ -113,6 +109,8 @@ class DDPG(object):
             b1 = tf.get_variable('b1', [1, n_l1], trainable=trainable)
             net = tf.nn.relu(tf.matmul(s, w1_s) + tf.matmul(a, w1_a) + b1)
             return tf.layers.dense(net, 1, trainable=trainable)  # Q(s,a)
+
+###############################  training  ####################################
 
 env = gym.make(ENV_NAME)
 env = env.unwrapped
