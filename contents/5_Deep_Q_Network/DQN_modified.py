@@ -6,8 +6,7 @@ view the tensorboard picture about this DQN structure on: https://morvanzhou.git
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
-Tensorflow: 1.0
-gym: 0.7.3
+Tensorflow: r1.2
 """
 
 import numpy as np
