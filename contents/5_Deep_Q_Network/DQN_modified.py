@@ -1,5 +1,5 @@
 """
-This part of code is the DQN brain.
+This part of code is the Deep Q Network (DQN) brain.
 
 view the tensorboard picture about this DQN structure on: https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/4-3-DQN3/#modification
 
