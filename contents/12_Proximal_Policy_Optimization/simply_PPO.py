@@ -18,33 +18,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 import gym
 
-EP_MAX = 800
+EP_MAX = 1000
 EP_STEP = 200
 GAMMA = 0.9
 A_LR = 0.0001
 C_LR = 0.0002
+BATCH = 100
 A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
-KL_TARGET = 0.01
-T = 100
+METHOD = [
+    dict(name='kl_pen', kl_target=0.01, lam=0.5),   # KL penalty
+    dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective
+][1]        # choose the method for optimization
 
 
 class PPO(object):
-    lam = 0.5
-    sess = tf.Session()
 
-    def __init__(self, s_dim, a_dim, kl_target,):
+    def __init__(self, s_dim, a_dim,):
         self.a_dim = a_dim
         self.s_dim = s_dim
-        self.kl_target = kl_target
+        self.sess = tf.Session()
 
-        self.tfs = tf.placeholder(tf.float32, [None, s_dim])
+        self.tfs = tf.placeholder(tf.float32, [None, s_dim], 'state')
 
         # critic
         with tf.variable_scope('critic'):
             l1 = tf.layers.dense(self.tfs, 100, tf.nn.relu)
             self.v = tf.layers.dense(l1, 1)
-            self.tfdc_r = tf.placeholder(tf.float32, [None, ])
+            self.tfdc_r = tf.placeholder(tf.float32, [None, ], 'discounted_r')
             self.advantage = self.tfdc_r - tf.squeeze(self.v)
             self.closs = tf.reduce_mean(tf.square(self.advantage))
             self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
@@ -52,21 +53,27 @@ class PPO(object):
         # actor
         pi, pi_params = self._build_anet('pi', trainable=True)
         oldpi, oldpi_params = self._build_anet('oldpi', trainable=False)
-
+        self.sample_op = pi.sample(1)       # choosing action
         with tf.variable_scope('update_oldpi'):
             self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
 
-        self.sample_op = pi.sample(1)
         self.tfa = tf.placeholder(tf.float32, [None, ], 'action')
-        with tf.variable_scope('ratio'):
+        self.tfadv = tf.placeholder(tf.float32, [None, ], 'advantage')
+        with tf.variable_scope('surrogate'):
             # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
             ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
-        with tf.variable_scope('kl'):
-            self.kl = tf.stop_gradient(tf.reduce_mean(kl_divergence(oldpi, pi)))
-        self.tflam = tf.placeholder(tf.float32, None, 'lambda')
-        self.tfadv = tf.placeholder(tf.float32, [None, ], 'advantage')
-        with tf.variable_scope('loss'):
-            self.aloss = -(tf.reduce_mean(ratio * self.tfadv) - self.tflam * self.kl)
+            surr = ratio * self.tfadv
+        if METHOD['name'] == 'kl_pen':
+            self.tflam = tf.placeholder(tf.float32, None, 'lambda')
+            with tf.variable_scope('loss'):
+                self.kl = tf.stop_gradient(tf.reduce_mean(kl_divergence(oldpi, pi)))
+                self.aloss = -(tf.reduce_mean(surr) - self.tflam * self.kl)
+        else:   # clipping method
+            with tf.variable_scope('loss'):
+                self.aloss = -tf.reduce_mean(tf.minimum(
+                    surr,
+                    tf.clip_by_value(ratio, 1.-METHOD['epsilon'], 1.+METHOD['epsilon'])*self.tfadv))
+
         with tf.variable_scope('atrain'):
             self.atrain_op = tf.train.AdamOptimizer(A_LR).minimize(self.aloss)
 
@@ -82,22 +89,23 @@ class PPO(object):
         # adv = (adv - adv.mean())/(adv.std()+1e-6)     # sometimes helpful
 
         # update actor
-        for _ in range(m):
-            _, kl = self.sess.run(
-                [self.atrain_op, self.kl],
-                {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: self.lam})
-            if kl > 4*KL_TARGET:
-                break
+        if METHOD['name'] == 'kl_pen':
+            for _ in range(m):
+                _, kl = self.sess.run(
+                    [self.atrain_op, self.kl],
+                    {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: METHOD['lam']})
+                if kl > 4*METHOD['kl_target']:
+                    break
+            if kl < METHOD['kl_target'] / 1.5:  # adaptive lambda
+                METHOD['lam'] /= 2
+            elif kl > METHOD['kl_target'] * 1.5:
+                METHOD['lam'] *= 2
+            METHOD['lam'] = np.clip(self.lam, 1e-4, 10)
+        else:   # clipping method
+            [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(m)]
 
         # update critic
         [self.sess.run(self.ctrain_op, {self.tfs: s, self.tfdc_r: r}) for _ in range(b)]
-
-        # adaptive lambda
-        if kl < self.kl_target / 1.5:
-            self.lam /= 2
-        elif kl > self.kl_target * 1.5:
-            self.lam *= 2
-        self.lam = np.clip(self.lam, 1e-4, 10)
 
     def _build_anet(self, name, trainable):
         with tf.variable_scope(name):
@@ -118,7 +126,7 @@ class PPO(object):
         return self.sess.run(self.v, {self.tfs: s})[0, 0]
 
 env = gym.make('Pendulum-v0').unwrapped
-ppo = PPO(3, 1, KL_TARGET)
+ppo = PPO(s_dim=3, a_dim=1)
 all_ep_r = []
 
 for ep in range(EP_MAX):
@@ -136,7 +144,7 @@ for ep in range(EP_MAX):
         ep_r += r
 
         # update ppo
-        if t % (T-1) == 0 or t == EP_STEP-1:
+        if t % (BATCH-1) == 0 or t == EP_STEP-1:
             ppo.update_oldpi()
             v_s_ = ppo.get_v(s_)
             discounted_r = []
@@ -153,7 +161,6 @@ for ep in range(EP_MAX):
     print(
         'Ep: %i' % ep,
         "|Ep_r: %i" % ep_r,
-        "|lamb: %.3f" % ppo.lam,
     )
 
 plt.plot(np.arange(len(all_ep_r)), all_ep_r)
