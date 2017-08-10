@@ -26,7 +26,7 @@ LOG_DIR = './log'
 N_WORKERS = multiprocessing.cpu_count()
 MAX_GLOBAL_EP = 1000
 GLOBAL_NET_SCOPE = 'Global_Net'
-UPDATE_GLOBAL_ITER = 20
+UPDATE_GLOBAL_ITER = 10
 GAMMA = 0.9
 ENTROPY_BETA = 0.001
 LR_A = 0.001    # learning rate for actor
@@ -35,7 +35,6 @@ GLOBAL_RUNNING_R = []
 GLOBAL_EP = 0
 
 env = gym.make(GAME)
-
 N_S = env.observation_space.shape[0]
 N_A = env.action_space.n
 
@@ -64,7 +63,8 @@ class ACNet(object):
                 with tf.name_scope('a_loss'):
                     log_prob = tf.reduce_sum(tf.log(self.a_prob) * tf.one_hot(self.a_his, N_A, dtype=tf.float32), axis=1, keep_dims=True)
                     exp_v = log_prob * td
-                    entropy = -tf.reduce_sum(self.a_prob * tf.log(self.a_prob), axis=1, keep_dims=True)  # encourage exploration
+                    entropy = tf.stop_gradient(-tf.reduce_sum(self.a_prob * tf.log(self.a_prob),
+                                                              axis=1, keep_dims=True))  # encourage exploration
                     self.exp_v = ENTROPY_BETA * entropy + exp_v
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 
