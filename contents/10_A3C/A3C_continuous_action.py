@@ -26,7 +26,7 @@ N_WORKERS = multiprocessing.cpu_count()
 MAX_EP_STEP = 200
 MAX_GLOBAL_EP = 2000
 GLOBAL_NET_SCOPE = 'Global_Net'
-UPDATE_GLOBAL_ITER = 5
+UPDATE_GLOBAL_ITER = 10
 GAMMA = 0.9
 ENTROPY_BETA = 0.01
 LR_A = 0.0001    # learning rate for actor
@@ -126,17 +126,16 @@ class Worker(object):
             s = self.env.reset()
             ep_r = 0
             for ep_t in range(MAX_EP_STEP):
-                if self.name == 'W_0':
-                    self.env.render()
+                # if self.name == 'W_0':
+                #     self.env.render()
                 a = self.AC.choose_action(s)
                 s_, r, done, info = self.env.step(a)
                 done = True if ep_t == MAX_EP_STEP - 1 else False
-                r /= 10     # normalize reward
 
                 ep_r += r
                 buffer_s.append(s)
                 buffer_a.append(a)
-                buffer_r.append(r)
+                buffer_r.append((r+8)/8)    # normalize
 
                 if total_step % UPDATE_GLOBAL_ITER == 0 or done:   # update global and assign to local net
                     if done:

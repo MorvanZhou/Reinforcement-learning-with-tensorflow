@@ -1,17 +1,32 @@
+"""
+A simple version of Proximal Policy Optimization (PPO) using single thread.
+
+Based on:
+1. Emergence of Locomotion Behaviours in Rich Environments (Google Deepmind): [http://adsabs.harvard.edu/abs/2017arXiv170702286H]
+2. Proximal Policy Optimization Algorithms (OpenAI): [http://adsabs.harvard.edu/abs/2017arXiv170706347S]
+
+View more on my tutorial website: https://morvanzhou.github.io/tutorials
+
+Dependencies:
+tensorflow r1.2
+gym 0.9.2
+"""
+
 import tensorflow as tf
 from tensorflow.contrib.distributions import Normal, kl_divergence
 import numpy as np
+import matplotlib.pyplot as plt
 import gym
 
-EP_MAX = 1000
+EP_MAX = 800
 EP_STEP = 200
 GAMMA = 0.9
 A_LR = 0.0001
-C_LR = 0.001
-M = 20
-B = 10
+C_LR = 0.0002
+A_UPDATE_STEPS = 10
+C_UPDATE_STEPS = 10
 KL_TARGET = 0.01
-T = 200
+T = 100
 
 
 class PPO(object):
@@ -44,22 +59,18 @@ class PPO(object):
         self.sample_op = pi.sample(1)
         self.tfa = tf.placeholder(tf.float32, [None, ], 'action')
         with tf.variable_scope('ratio'):
-            self.t = ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
-            # ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
-
+            # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
+            ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
         with tf.variable_scope('kl'):
             self.kl = tf.stop_gradient(tf.reduce_mean(kl_divergence(oldpi, pi)))
         self.tflam = tf.placeholder(tf.float32, None, 'lambda')
         self.tfadv = tf.placeholder(tf.float32, [None, ], 'advantage')
-        with tf.variable_scope('entropy'):
-            entropy = tf.stop_gradient(pi.entropy())
         with tf.variable_scope('loss'):
-            self.aloss = -(tf.reduce_mean(ratio * self.tfadv) - self.tflam * self.kl + 0.2 * entropy)
-        # self.aloss = -(tf.reduce_mean(pi.log_prob(self.tfa)*self.tfadv) + 0.2 * tf.stop_gradient(pi.entropy()))
+            self.aloss = -(tf.reduce_mean(ratio * self.tfadv) - self.tflam * self.kl)
         with tf.variable_scope('atrain'):
             self.atrain_op = tf.train.AdamOptimizer(A_LR).minimize(self.aloss)
 
-        tf.summary.FileWriter("logs/", self.sess.graph)
+        tf.summary.FileWriter("log/", self.sess.graph)
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -68,11 +79,12 @@ class PPO(object):
 
     def update(self, s, a, r, m=20, b=10):
         adv = self.sess.run(self.advantage, {self.tfs: s, self.tfdc_r: r})
+        # adv = (adv - adv.mean())/(adv.std()+1e-6)     # sometimes helpful
 
         # update actor
         for _ in range(m):
-            _, kl, t = self.sess.run(
-                [self.atrain_op, self.kl, self.t],
+            _, kl = self.sess.run(
+                [self.atrain_op, self.kl],
                 {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: self.lam})
             if kl > 4*KL_TARGET:
                 break
@@ -85,7 +97,7 @@ class PPO(object):
             self.lam /= 2
         elif kl > self.kl_target * 1.5:
             self.lam *= 2
-        return kl
+        self.lam = np.clip(self.lam, 1e-4, 10)
 
     def _build_anet(self, name, trainable):
         with tf.variable_scope(name):
@@ -103,31 +115,30 @@ class PPO(object):
 
     def get_v(self, s):
         if s.ndim < 2: s = s[np.newaxis, :]
-        return self.sess.run(self.v, {self.tfs: s})
+        return self.sess.run(self.v, {self.tfs: s})[0, 0]
 
 env = gym.make('Pendulum-v0').unwrapped
 ppo = PPO(3, 1, KL_TARGET)
+all_ep_r = []
 
 for ep in range(EP_MAX):
     s = env.reset()
     buffer_s, buffer_a, buffer_r = [], [], []
     ep_r = 0
-    for t in range(1, EP_STEP): # one episode
+    for t in range(1, EP_STEP):    # one episode
         env.render()
         a = ppo.choose_action(s)
         s_, r, done, _ = env.step(a)
-        if t == EP_STEP-1: done = True
         buffer_s.append(s)
         buffer_a.append(a)
-        buffer_r.append(r)
+        buffer_r.append((r+8)/8)    # normalize reward, find to be useful
         s = s_
         ep_r += r
-        if t % (T-1) == 0 or done:
+
+        # update ppo
+        if t % (T-1) == 0 or t == EP_STEP-1:
             ppo.update_oldpi()
-            if done:
-                v_s_ = 0
-            else:
-                v_s_ = ppo.get_v(s_)[0, 0]
+            v_s_ = ppo.get_v(s_)
             discounted_r = []
             for r in buffer_r[::-1]:
                 v_s_ = r + GAMMA * v_s_
@@ -136,11 +147,14 @@ for ep in range(EP_MAX):
 
             bs, ba, br = np.vstack(buffer_s), np.concatenate(buffer_a), np.array(discounted_r)
             buffer_s, buffer_a, buffer_r = [], [], []
-            kl = ppo.update(bs, ba, br, m=M, b=B)
-
+            ppo.update(bs, ba, br, m=A_UPDATE_STEPS, b=C_UPDATE_STEPS)
+    if ep == 0: all_ep_r.append(ep_r)
+    else: all_ep_r.append(all_ep_r[-1]*0.9 + ep_r*0.1)
     print(
         'Ep: %i' % ep,
         "|Ep_r: %i" % ep_r,
-        "|KL: %.3f" % kl,
         "|lamb: %.3f" % ppo.lam,
     )
+
+plt.plot(np.arange(len(all_ep_r)), all_ep_r)
+plt.xlabel('Episode');plt.ylabel('Moving averaged episode reward');plt.show()

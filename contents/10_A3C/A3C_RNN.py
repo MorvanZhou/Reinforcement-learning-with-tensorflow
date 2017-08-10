@@ -105,7 +105,6 @@ class ACNet(object):
             v = tf.layers.dense(l_c, 1, kernel_initializer=w_init, name='v')  # state value
 
         with tf.variable_scope('actor'):  # state representation is based on critic
-            cell_out = tf.stop_gradient(cell_out, name='c_cell_out')    # from what critic think it is
             l_a = tf.layers.dense(cell_out, 80, tf.nn.relu6, kernel_initializer=w_init, name='la')
             mu = tf.layers.dense(l_a, N_A, tf.nn.tanh, kernel_initializer=w_init, name='mu')
             sigma = tf.layers.dense(l_a, N_A, tf.nn.softplus, kernel_initializer=w_init, name='sigma')
@@ -145,12 +144,11 @@ class Worker(object):
                 a, rnn_state_ = self.AC.choose_action(s, rnn_state)  # get the action and next rnn state
                 s_, r, done, info = self.env.step(a)
                 done = True if ep_t == MAX_EP_STEP - 1 else False
-                r /= 10     # normalize reward
 
                 ep_r += r
                 buffer_s.append(s)
                 buffer_a.append(a)
-                buffer_r.append(r)
+                buffer_r.append((r+8)/8)    # normalize
 
                 if total_step % UPDATE_GLOBAL_ITER == 0 or done:   # update global and assign to local net
                     if done:
