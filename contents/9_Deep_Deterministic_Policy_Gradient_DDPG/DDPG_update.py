@@ -16,14 +16,13 @@ import gym
 
 #####################  hyper parameters  ####################
 
-MAX_EPISODES = 70
-MAX_EP_STEPS = 400
-LR_A = 0.01  # learning rate for actor
-LR_C = 0.01  # learning rate for critic
-GAMMA = 0.9  # reward discount
-REPLACE_ITER_A = 500
-REPLACE_ITER_C = 300
-MEMORY_CAPACITY = 7000
+MAX_EPISODES = 200
+MAX_EP_STEPS = 200
+LR_A = 0.001    # learning rate for actor
+LR_C = 0.002    # learning rate for critic
+GAMMA = 0.9     # reward discount
+TAU = 0.01      # soft replacement
+MEMORY_CAPACITY = 10000
 BATCH_SIZE = 32
 
 RENDER = False
@@ -58,6 +57,10 @@ class DDPG(object):
         self.ce_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Critic/eval')
         self.ct_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Critic/target')
 
+        # target net replacement
+        self.soft_replace = [[tf.assign(ta, (1 - TAU) * ta + TAU * ea), tf.assign(tc, (1 - TAU) * tc + TAU * ec)]
+                             for ta, ea, tc, ec in zip(self.at_params, self.ae_params, self.ct_params, self.ce_params)]
+
         q_target = self.R + GAMMA * q_
         # in the feed_dic for the td_error, the self.a should change to actions in memory
         td_error = tf.losses.mean_squared_error(labels=q_target, predictions=q)
@@ -72,12 +75,8 @@ class DDPG(object):
         return self.sess.run(self.a, {self.S: s[np.newaxis, :]})[0]
 
     def learn(self):
-        # hard replace parameters
-        if self.a_replace_counter % REPLACE_ITER_A == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.at_params, self.ae_params)])
-        if self.c_replace_counter % REPLACE_ITER_C == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.ct_params, self.ce_params)])
-        self.a_replace_counter += 1; self.c_replace_counter += 1
+        # soft target replacement
+        self.sess.run(self.soft_replace)
 
         indices = np.random.choice(MEMORY_CAPACITY, size=BATCH_SIZE)
         bt = self.memory[indices, :]
@@ -145,5 +144,5 @@ for i in range(MAX_EPISODES):
         ep_reward += r
         if j == MAX_EP_STEPS-1:
             print('Episode:', i, ' Reward: %i' % int(ep_reward), 'Explore: %.2f' % var, )
-            if ep_reward > -1000:RENDER = True
+            if ep_reward > -300:RENDER = True
             break

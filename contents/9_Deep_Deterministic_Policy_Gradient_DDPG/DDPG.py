@@ -19,16 +19,16 @@ tf.set_random_seed(1)
 
 #####################  hyper parameters  ####################
 
-MAX_EPISODES = 70
-MAX_EP_STEPS = 400
-LR_A = 0.01  # learning rate for actor
-LR_C = 0.01  # learning rate for critic
-GAMMA = 0.9  # reward discount
-TAU = 0.01  # Soft update for target param, but this is computationally expansive
-# so we use replace_iter instead
-REPLACE_ITER_A = 500
-REPLACE_ITER_C = 300
-MEMORY_CAPACITY = 7000
+MAX_EPISODES = 200
+MAX_EP_STEPS = 200
+LR_A = 0.001    # learning rate for actor
+LR_C = 0.001    # learning rate for critic
+GAMMA = 0.9     # reward discount
+REPLACEMENT = [
+    dict(name='soft', tau=0.01),
+    dict(name='hard', rep_iter_a=600, rep_iter_c=500)
+][1]            # you can try different target replacement strategies
+MEMORY_CAPACITY = 10000
 BATCH_SIZE = 32
 
 RENDER = False
@@ -37,13 +37,14 @@ ENV_NAME = 'Pendulum-v0'
 
 ###############################  Actor  ####################################
 
+
 class Actor(object):
-    def __init__(self, sess, action_dim, action_bound, learning_rate, t_replace_iter):
+    def __init__(self, sess, action_dim, action_bound, learning_rate, replacement):
         self.sess = sess
         self.a_dim = action_dim
         self.action_bound = action_bound
         self.lr = learning_rate
-        self.t_replace_iter = t_replace_iter
+        self.replacement = replacement
         self.t_replace_counter = 0
 
         with tf.variable_scope('Actor'):
@@ -55,6 +56,13 @@ class Actor(object):
 
         self.e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Actor/eval_net')
         self.t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Actor/target_net')
+
+        if self.replacement['name'] == 'hard':
+            self.t_replace_counter = 0
+            self.hard_replace = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)]
+        else:
+            self.soft_replace = [tf.assign(t, (1 - self.replacement['tau']) * t + self.replacement['tau'] * e)
+                                 for t, e in zip(self.t_params, self.e_params)]
 
     def _build_net(self, s, scope, trainable):
         with tf.variable_scope(scope):
@@ -71,14 +79,13 @@ class Actor(object):
 
     def learn(self, s):   # batch update
         self.sess.run(self.train_op, feed_dict={S: s})
-        # the following method for soft replace target params is computational expansive
-        # target_params = (1-tau) * target_params + tau * eval_params
-        # self.sess.run([tf.assign(t, (1 - self.tau) * t + self.tau * e) for t, e in zip(self.t_params, self.e_params)])
 
-        # instead of above method, I use a hard replacement here
-        if self.t_replace_counter % self.t_replace_iter == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
-        self.t_replace_counter += 1
+        if self.replacement['name'] == 'soft':
+            self.sess.run(self.soft_replace)
+        else:
+            if self.t_replace_counter % self.replacement['rep_iter_a'] == 0:
+                self.sess.run(self.hard_replace)
+            self.t_replace_counter += 1
 
     def choose_action(self, s):
         s = s[np.newaxis, :]    # single state
@@ -100,14 +107,13 @@ class Actor(object):
 ###############################  Critic  ####################################
 
 class Critic(object):
-    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, t_replace_iter, a, a_):
+    def __init__(self, sess, state_dim, action_dim, learning_rate, gamma, replacement, a, a_):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
         self.lr = learning_rate
         self.gamma = gamma
-        self.t_replace_iter = t_replace_iter
-        self.t_replace_counter = 0
+        self.replacement = replacement
 
         with tf.variable_scope('Critic'):
             # Input (s, a), output q
@@ -132,6 +138,13 @@ class Critic(object):
         with tf.variable_scope('a_grad'):
             self.a_grads = tf.gradients(self.q, a)[0]   # tensor of gradients of each sample (None, a_dim)
 
+        if self.replacement['name'] == 'hard':
+            self.t_replace_counter = 0
+            self.hard_replacement = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)]
+        else:
+            self.soft_replacement = [tf.assign(t, (1 - self.replacement['tau']) * t + self.replacement['tau'] * e)
+                                     for t, e in zip(self.t_params, self.e_params)]
+
     def _build_net(self, s, a, scope, trainable):
         with tf.variable_scope(scope):
             init_w = tf.random_normal_initializer(0., 0.1)
@@ -150,14 +163,12 @@ class Critic(object):
 
     def learn(self, s, a, r, s_):
         self.sess.run(self.train_op, feed_dict={S: s, self.a: a, R: r, S_: s_})
-        # the following method for soft replace target params is computational expansive
-        # target_params = (1-tau) * target_params + tau * eval_params
-        # self.sess.run([tf.assign(t, (1 - self.tau) * t + self.tau * e) for t, e in zip(self.t_params, self.e_params)])
-
-        # instead of above method, we use a hard replacement here
-        if self.t_replace_counter % self.t_replace_iter == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
-        self.t_replace_counter += 1
+        if self.replacement['name'] == 'soft':
+            self.sess.run(self.soft_replacement)
+        else:
+            if self.t_replace_counter % self.replacement['rep_iter_c'] == 0:
+                self.sess.run(self.hard_replacement)
+            self.t_replace_counter += 1
 
 
 #####################  Memory  ####################
@@ -201,8 +212,8 @@ sess = tf.Session()
 
 # Create actor and critic.
 # They are actually connected to each other, details can be seen in tensorboard or in this picture:
-actor = Actor(sess, action_dim, action_bound, LR_A, REPLACE_ITER_A)
-critic = Critic(sess, state_dim, action_dim, LR_C, GAMMA, REPLACE_ITER_C, actor.a, actor.a_)
+actor = Actor(sess, action_dim, action_bound, LR_A, REPLACEMENT)
+critic = Critic(sess, state_dim, action_dim, LR_C, GAMMA, REPLACEMENT, actor.a, actor.a_)
 actor.add_grad_to_graph(critic.a_grads)
 
 sess.run(tf.global_variables_initializer())
@@ -246,6 +257,6 @@ for i in range(MAX_EPISODES):
 
         if j == MAX_EP_STEPS-1:
             print('Episode:', i, ' Reward: %i' % int(ep_reward), 'Explore: %.2f' % var, )
-            if ep_reward > -1000:
+            if ep_reward > -300:
                 RENDER = True
             break
