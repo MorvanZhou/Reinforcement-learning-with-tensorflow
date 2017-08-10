@@ -45,20 +45,20 @@ class PPO(object):
         with tf.variable_scope('critic'):
             l1 = tf.layers.dense(self.tfs, 100, tf.nn.relu)
             self.v = tf.layers.dense(l1, 1)
-            self.tfdc_r = tf.placeholder(tf.float32, [None, ], 'discounted_r')
-            self.advantage = self.tfdc_r - tf.squeeze(self.v)
+            self.tfdc_r = tf.placeholder(tf.float32, [None, 1], 'discounted_r')
+            self.advantage = self.tfdc_r - self.v
             self.closs = tf.reduce_mean(tf.square(self.advantage))
             self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
 
         # actor
         pi, pi_params = self._build_anet('pi', trainable=True)
         oldpi, oldpi_params = self._build_anet('oldpi', trainable=False)
-        self.sample_op = pi.sample(1)       # choosing action
+        self.sample_op = tf.squeeze(pi.sample(1), axis=0)       # choosing action
         with tf.variable_scope('update_oldpi'):
             self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
 
-        self.tfa = tf.placeholder(tf.float32, [None, ], 'action')
-        self.tfadv = tf.placeholder(tf.float32, [None, ], 'advantage')
+        self.tfa = tf.placeholder(tf.float32, [None, a_dim], 'action')
+        self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
         with tf.variable_scope('surrogate'):
             # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
             ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
@@ -66,8 +66,9 @@ class PPO(object):
         if METHOD['name'] == 'kl_pen':
             self.tflam = tf.placeholder(tf.float32, None, 'lambda')
             with tf.variable_scope('loss'):
-                self.kl = tf.stop_gradient(tf.reduce_mean(kl_divergence(oldpi, pi)))
-                self.aloss = -(tf.reduce_mean(surr) - self.tflam * self.kl)
+                kl = tf.stop_gradient(kl_divergence(oldpi, pi))
+                self.kl_mean = tf.reduce_mean(kl)
+                self.aloss = -(tf.reduce_mean(surr - self.tflam * kl))
         else:   # clipping method
             with tf.variable_scope('loss'):
                 self.aloss = -tf.reduce_mean(tf.minimum(
@@ -92,7 +93,7 @@ class PPO(object):
         if METHOD['name'] == 'kl_pen':
             for _ in range(m):
                 _, kl = self.sess.run(
-                    [self.atrain_op, self.kl],
+                    [self.atrain_op, self.kl_mean],
                     {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: METHOD['lam']})
                 if kl > 4*METHOD['kl_target']:
                     break
@@ -100,7 +101,7 @@ class PPO(object):
                 METHOD['lam'] /= 2
             elif kl > METHOD['kl_target'] * 1.5:
                 METHOD['lam'] *= 2
-            METHOD['lam'] = np.clip(self.lam, 1e-4, 10)
+            METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # some time explode
         else:   # clipping method
             [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(m)]
 
@@ -112,13 +113,13 @@ class PPO(object):
             l1 = tf.layers.dense(self.tfs, 100, tf.nn.relu, trainable=trainable)
             mu = 2 * tf.layers.dense(l1, self.a_dim, tf.nn.tanh, trainable=trainable)
             sigma = tf.layers.dense(l1, self.a_dim, tf.nn.softplus, trainable=trainable)
-            norm_dist = Normal(loc=tf.squeeze(mu), scale=tf.squeeze(sigma))
+            norm_dist = Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         return norm_dist, params
 
     def choose_action(self, s):
         s = s[np.newaxis, :]
-        a = self.sess.run(self.sample_op, {self.tfs: s})
+        a = self.sess.run(self.sample_op, {self.tfs: s})[:, 0]
         return np.clip(a, -2, 2)
 
     def get_v(self, s):
@@ -153,7 +154,7 @@ for ep in range(EP_MAX):
                 discounted_r.append(v_s_)
             discounted_r.reverse()
 
-            bs, ba, br = np.vstack(buffer_s), np.concatenate(buffer_a), np.array(discounted_r)
+            bs, ba, br = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r)[:, np.newaxis]
             buffer_s, buffer_a, buffer_r = [], [], []
             ppo.update(bs, ba, br, m=A_UPDATE_STEPS, b=C_UPDATE_STEPS)
     if ep == 0: all_ep_r.append(ep_r)
@@ -161,6 +162,7 @@ for ep in range(EP_MAX):
     print(
         'Ep: %i' % ep,
         "|Ep_r: %i" % ep_r,
+        ("|Lam: %.4f" % METHOD['lam']) if METHOD['name'] == 'kl_pen' else '',
     )
 
 plt.plot(np.arange(len(all_ep_r)), all_ep_r)
