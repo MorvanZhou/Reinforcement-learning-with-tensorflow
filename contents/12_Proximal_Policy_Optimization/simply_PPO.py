@@ -23,13 +23,13 @@ EP_STEP = 200
 GAMMA = 0.9
 A_LR = 0.0001
 C_LR = 0.0002
-BATCH = 100
+BATCH = 32
 A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
 METHOD = [
     dict(name='kl_pen', kl_target=0.01, lam=0.5),   # KL penalty
     dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective
-][1]        # choose the method for optimization
+][0]        # choose the method for optimization
 
 
 class PPO(object):
@@ -119,7 +119,7 @@ class PPO(object):
 
     def choose_action(self, s):
         s = s[np.newaxis, :]
-        a = self.sess.run(self.sample_op, {self.tfs: s})[:, 0]
+        a = self.sess.run(self.sample_op, {self.tfs: s})[0]
         return np.clip(a, -2, 2)
 
     def get_v(self, s):
