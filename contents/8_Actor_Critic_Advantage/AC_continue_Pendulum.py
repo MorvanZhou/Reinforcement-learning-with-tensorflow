@@ -65,7 +65,7 @@ class Actor(object):
             log_prob = self.normal_dist.log_prob(self.a)  # loss without advantage
             self.exp_v = log_prob * self.td_error  # advantage (TD_error) guided loss
             # Add cross entropy cost to encourage exploration
-            self.exp_v += self.normal_dist.entropy()
+            self.exp_v += tf.stop_gradient(0.1*self.normal_dist.entropy())
 
         with tf.name_scope('train'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(-self.exp_v, global_step)    # min(v) = max(-v)
@@ -125,8 +125,8 @@ class Critic(object):
 
 OUTPUT_GRAPH = False
 MAX_EPISODE = 1000
-MAX_EP_STEPS = 300
-DISPLAY_REWARD_THRESHOLD = -550  # renders environment if total episode reward is greater then this threshold
+MAX_EP_STEPS = 200
+DISPLAY_REWARD_THRESHOLD = -100  # renders environment if total episode reward is greater then this threshold
 RENDER = False  # rendering wastes time
 GAMMA = 0.9
 LR_A = 0.001    # learning rate for actor

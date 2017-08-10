@@ -23,8 +23,8 @@ GAME = 'Pendulum-v0'
 OUTPUT_GRAPH = True
 LOG_DIR = './log'
 N_WORKERS = multiprocessing.cpu_count()
-MAX_EP_STEP = 400
-MAX_GLOBAL_EP = 800
+MAX_EP_STEP = 200
+MAX_GLOBAL_EP = 2000
 GLOBAL_NET_SCOPE = 'Global_Net'
 UPDATE_GLOBAL_ITER = 5
 GAMMA = 0.9
@@ -70,7 +70,7 @@ class ACNet(object):
                 with tf.name_scope('a_loss'):
                     log_prob = normal_dist.log_prob(self.a_his)
                     exp_v = log_prob * td
-                    entropy = normal_dist.entropy()  # encourage exploration
+                    entropy = tf.stop_gradient(normal_dist.entropy())  # encourage exploration
                     self.exp_v = ENTROPY_BETA * entropy + exp_v
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 
@@ -90,7 +90,7 @@ class ACNet(object):
                     self.update_a_op = OPT_A.apply_gradients(zip(self.a_grads, globalAC.a_params))
                     self.update_c_op = OPT_C.apply_gradients(zip(self.c_grads, globalAC.c_params))
 
-    def _build_net(self ):
+    def _build_net(self):
         w_init = tf.random_normal_initializer(0., .1)
         with tf.variable_scope('actor'):
             l_a = tf.layers.dense(self.s, 200, tf.nn.relu6, kernel_initializer=w_init, name='la')
