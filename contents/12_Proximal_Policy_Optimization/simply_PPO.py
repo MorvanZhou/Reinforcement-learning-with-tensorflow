@@ -28,7 +28,7 @@ A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
 METHOD = [
     dict(name='kl_pen', kl_target=0.01, lam=0.5),   # KL penalty
-    dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective
+    dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective, find this is better
 ][1]        # choose the method for optimization
 
 
@@ -69,7 +69,7 @@ class PPO(object):
                 kl = tf.stop_gradient(kl_divergence(oldpi, pi))
                 self.kl_mean = tf.reduce_mean(kl)
                 self.aloss = -(tf.reduce_mean(surr - self.tflam * kl))
-        else:   # clipping method
+        else:   # clipping method, find this is better
             with tf.variable_scope('loss'):
                 self.aloss = -tf.reduce_mean(tf.minimum(
                     surr,
@@ -82,10 +82,8 @@ class PPO(object):
 
         self.sess.run(tf.global_variables_initializer())
 
-    def update_oldpi(self):
-        self.sess.run(self.update_oldpi_op)
-
     def update(self, s, a, r, m=20, b=10):
+        self.sess.run(self.update_oldpi_op)
         adv = self.sess.run(self.advantage, {self.tfs: s, self.tfdc_r: r})
         # adv = (adv - adv.mean())/(adv.std()+1e-6)     # sometimes helpful
 
@@ -95,14 +93,14 @@ class PPO(object):
                 _, kl = self.sess.run(
                     [self.atrain_op, self.kl_mean],
                     {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: METHOD['lam']})
-                if kl > 4*METHOD['kl_target']:
+                if kl > 4*METHOD['kl_target']:  # this in in google's paper
                     break
-            if kl < METHOD['kl_target'] / 1.5:  # adaptive lambda
+            if kl < METHOD['kl_target'] / 1.5:  # adaptive lambda, this is in OpenAI's paper
                 METHOD['lam'] /= 2
             elif kl > METHOD['kl_target'] * 1.5:
                 METHOD['lam'] *= 2
-            METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # some time explode
-        else:   # clipping method
+            METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # some time explode, this is my method
+        else:   # clipping method, find this is better (OpenAI's paper)
             [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(m)]
 
         # update critic
@@ -146,7 +144,6 @@ for ep in range(EP_MAX):
 
         # update ppo
         if t % (BATCH-1) == 0 or t == EP_LEN-1:
-            ppo.update_oldpi()
             v_s_ = ppo.get_v(s_)
             discounted_r = []
             for r in buffer_r[::-1]:

@@ -32,6 +32,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
 * [Deep Deterministic Policy Gradient](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/9_Deep_Deterministic_Policy_Gradient_DDPG)
 * [A3C](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/10_A3C)
 * [Dyna-Q](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/11_Dyna_Q)
+* [Proximal Policy Optimization (PPO)](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/12_Proximal_Policy_Optimization)
 
 ### [Some of my experients](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments)
 
