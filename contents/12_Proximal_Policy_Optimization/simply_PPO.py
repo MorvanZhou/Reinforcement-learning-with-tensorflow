@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import gym
 
 EP_MAX = 1000
-EP_STEP = 200
+EP_LEN = 200
 GAMMA = 0.9
 A_LR = 0.0001
 C_LR = 0.0002
@@ -29,7 +29,7 @@ C_UPDATE_STEPS = 10
 METHOD = [
     dict(name='kl_pen', kl_target=0.01, lam=0.5),   # KL penalty
     dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective
-][0]        # choose the method for optimization
+][1]        # choose the method for optimization
 
 
 class PPO(object):
@@ -134,7 +134,7 @@ for ep in range(EP_MAX):
     s = env.reset()
     buffer_s, buffer_a, buffer_r = [], [], []
     ep_r = 0
-    for t in range(1, EP_STEP):    # one episode
+    for t in range(1, EP_LEN):    # one episode
         env.render()
         a = ppo.choose_action(s)
         s_, r, done, _ = env.step(a)
@@ -145,7 +145,7 @@ for ep in range(EP_MAX):
         ep_r += r
 
         # update ppo
-        if t % (BATCH-1) == 0 or t == EP_STEP-1:
+        if t % (BATCH-1) == 0 or t == EP_LEN-1:
             ppo.update_oldpi()
             v_s_ = ppo.get_v(s_)
             discounted_r = []

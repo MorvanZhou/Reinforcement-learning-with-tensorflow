@@ -21,7 +21,6 @@ if sys.version_info.major == 2:
 else:
     import tkinter as tk
 
-np.random.seed(1)
 
 UNIT = 40   # pixels
 MAZE_H = 4  # grid height
