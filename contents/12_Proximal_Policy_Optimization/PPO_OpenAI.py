@@ -18,9 +18,9 @@ import matplotlib.pyplot as plt
 import gym, threading
 from queue import Queue
 
-EP_MAX = 1000
+EP_MAX = 500
 EP_LEN = 200
-N_WORKER = 4
+N_WORKER = 3
 GAMMA = 0.9
 A_LR = 0.0001
 C_LR = 0.0002
@@ -134,11 +134,12 @@ class Worker(object):
                     bs, ba, br = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r)[:, np.newaxis]
                     buffer_s, buffer_a, buffer_r = [], [], []
                     queue.put(np.hstack((bs, ba, br)))
-                    if GLOBAL_EP >= EP_MAX:         # stop training
+                    if GLOBAL_EP >= EP_MAX:             # stop training
                         coord.request_stop()
                         break
-                    self.rolling_event.clear()      # stop roll-out
-                    self.rolling_event.wait()       # stop and wait until network is updated
+                    else:
+                        self.rolling_event.clear()      # stop roll-out
+                        self.rolling_event.wait()       # stop and wait until network is updated
 
             # record reward changes, plot later
             if len(GLOBAL_RUNNING_R) == 0: GLOBAL_RUNNING_R.append(ep_r)
