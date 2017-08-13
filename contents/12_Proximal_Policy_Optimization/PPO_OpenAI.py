@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import gym, threading
 from queue import Queue
 
-EP_MAX = 500
+EP_MAX = 600
 EP_LEN = 200
 N_WORKER = 3
 GAMMA = 0.9
