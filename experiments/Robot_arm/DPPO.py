@@ -18,19 +18,26 @@ import tensorflow as tf
 from tensorflow.contrib.distributions import Normal
 import numpy as np
 import matplotlib.pyplot as plt
-import gym, threading, queue
+import threading, queue
+from arm_env import ArmEnv
 
-EP_MAX = 1000
-EP_LEN = 200
+
+EP_MAX = 2000
+EP_LEN = 300
 N_WORKER = 4                # parallel workers
 GAMMA = 0.9                 # reward discount factor
 A_LR = 0.0001               # learning rate for actor
-C_LR = 0.001                # learning rate for critic
+C_LR = 0.0005                # learning rate for critic
 MIN_BATCH_SIZE = 64         # minimum batch size for updating PPO
 UPDATE_STEP = 5             # loop update operation n-steps
-EPSILON = 0.2               # for clipping surrogate objective
-GAME = 'Pendulum-v0'
-S_DIM, A_DIM = 3, 1         # state and action dimension
+EPSILON = 0.2               # Clipped surrogate objective
+MODE = ['easy', 'hard']
+n_model = 1
+
+env = ArmEnv(mode=MODE[n_model])
+S_DIM = env.state_dim
+A_DIM = env.action_dim
+A_BOUND = env.action_bound[1]
 
 
 class PPO(object):
@@ -85,7 +92,7 @@ class PPO(object):
     def _build_anet(self, name, trainable):
         with tf.variable_scope(name):
             l1 = tf.layers.dense(self.tfs, 200, tf.nn.relu, trainable=trainable)
-            mu = 2 * tf.layers.dense(l1, A_DIM, tf.nn.tanh, trainable=trainable)
+            mu = A_BOUND * tf.layers.dense(l1, A_DIM, tf.nn.tanh, trainable=trainable)
             sigma = tf.layers.dense(l1, A_DIM, tf.nn.softplus, trainable=trainable)
             norm_dist = Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
@@ -104,7 +111,7 @@ class PPO(object):
 class Worker(object):
     def __init__(self, wid):
         self.wid = wid
-        self.env = gym.make(GAME).unwrapped
+        self.env = ArmEnv(mode=MODE[n_model])
         self.ppo = GLOBAL_PPO
 
     def work(self):
@@ -116,12 +123,12 @@ class Worker(object):
             for t in range(EP_LEN):
                 if not ROLLING_EVENT.is_set():                  # while global PPO is updating
                     ROLLING_EVENT.wait()                        # wait until PPO is updated
-                    buffer_s, buffer_a, buffer_r = [], [], []   # clear history buffer, use new policy to collect data
+                    buffer_s, buffer_a, buffer_r = [], [], []   # clear history buffer
                 a = self.ppo.choose_action(s)
-                s_, r, done, _ = self.env.step(a)
+                s_, r, done = self.env.step(a)
                 buffer_s.append(s)
                 buffer_a.append(a)
-                buffer_r.append((r + 8) / 8)                    # normalize reward, find to be useful
+                buffer_r.append(r)                    # normalize reward, find to be useful
                 s = s_
                 ep_r += r
 
@@ -176,7 +183,7 @@ if __name__ == '__main__':
     # plot reward change and testing
     plt.plot(np.arange(len(GLOBAL_RUNNING_R)), GLOBAL_RUNNING_R)
     plt.xlabel('Episode'); plt.ylabel('Moving reward'); plt.ion(); plt.show()
-    env = gym.make('Pendulum-v0')
+    env.set_fps(30)
     while True:
         s = env.reset()
         for t in range(400):
