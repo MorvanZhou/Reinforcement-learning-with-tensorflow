@@ -26,6 +26,7 @@ C_LR = 0.0002
 BATCH = 32
 A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
+S_DIM, A_DIM = 3, 1
 METHOD = [
     dict(name='kl_pen', kl_target=0.01, lam=0.5),   # KL penalty
     dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective, find this is better
@@ -34,12 +35,9 @@ METHOD = [
 
 class PPO(object):
 
-    def __init__(self, s_dim, a_dim,):
-        self.a_dim = a_dim
-        self.s_dim = s_dim
+    def __init__(self):
         self.sess = tf.Session()
-
-        self.tfs = tf.placeholder(tf.float32, [None, s_dim], 'state')
+        self.tfs = tf.placeholder(tf.float32, [None, S_DIM], 'state')
 
         # critic
         with tf.variable_scope('critic'):
@@ -53,24 +51,24 @@ class PPO(object):
         # actor
         pi, pi_params = self._build_anet('pi', trainable=True)
         oldpi, oldpi_params = self._build_anet('oldpi', trainable=False)
-        self.sample_op = tf.squeeze(pi.sample(1), axis=0)       # choosing action
+        with tf.variable_scope('sample_action'):
+            self.sample_op = tf.squeeze(pi.sample(1), axis=0)       # choosing action
         with tf.variable_scope('update_oldpi'):
             self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
 
-        self.tfa = tf.placeholder(tf.float32, [None, a_dim], 'action')
+        self.tfa = tf.placeholder(tf.float32, [None, A_DIM], 'action')
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
-        with tf.variable_scope('surrogate'):
-            # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
-            ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
-            surr = ratio * self.tfadv
-        if METHOD['name'] == 'kl_pen':
-            self.tflam = tf.placeholder(tf.float32, None, 'lambda')
-            with tf.variable_scope('loss'):
+        with tf.variable_scope('loss'):
+            with tf.variable_scope('surrogate'):
+                # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
+                ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
+                surr = ratio * self.tfadv
+            if METHOD['name'] == 'kl_pen':
+                self.tflam = tf.placeholder(tf.float32, None, 'lambda')
                 kl = tf.stop_gradient(kl_divergence(oldpi, pi))
                 self.kl_mean = tf.reduce_mean(kl)
                 self.aloss = -(tf.reduce_mean(surr - self.tflam * kl))
-        else:   # clipping method, find this is better
-            with tf.variable_scope('loss'):
+            else:   # clipping method, find this is better
                 self.aloss = -tf.reduce_mean(tf.minimum(
                     surr,
                     tf.clip_by_value(ratio, 1.-METHOD['epsilon'], 1.+METHOD['epsilon'])*self.tfadv))
@@ -82,14 +80,14 @@ class PPO(object):
 
         self.sess.run(tf.global_variables_initializer())
 
-    def update(self, s, a, r, m=20, b=10):
+    def update(self, s, a, r):
         self.sess.run(self.update_oldpi_op)
         adv = self.sess.run(self.advantage, {self.tfs: s, self.tfdc_r: r})
         # adv = (adv - adv.mean())/(adv.std()+1e-6)     # sometimes helpful
 
         # update actor
         if METHOD['name'] == 'kl_pen':
-            for _ in range(m):
+            for _ in range(A_UPDATE_STEPS):
                 _, kl = self.sess.run(
                     [self.atrain_op, self.kl_mean],
                     {self.tfs: s, self.tfa: a, self.tfadv: adv, self.tflam: METHOD['lam']})
@@ -101,16 +99,16 @@ class PPO(object):
                 METHOD['lam'] *= 2
             METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # some time explode, this is my method
         else:   # clipping method, find this is better (OpenAI's paper)
-            [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(m)]
+            [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(A_UPDATE_STEPS)]
 
         # update critic
-        [self.sess.run(self.ctrain_op, {self.tfs: s, self.tfdc_r: r}) for _ in range(b)]
+        [self.sess.run(self.ctrain_op, {self.tfs: s, self.tfdc_r: r}) for _ in range(C_UPDATE_STEPS)]
 
     def _build_anet(self, name, trainable):
         with tf.variable_scope(name):
             l1 = tf.layers.dense(self.tfs, 100, tf.nn.relu, trainable=trainable)
-            mu = 2 * tf.layers.dense(l1, self.a_dim, tf.nn.tanh, trainable=trainable)
-            sigma = tf.layers.dense(l1, self.a_dim, tf.nn.softplus, trainable=trainable)
+            mu = 2 * tf.layers.dense(l1, A_DIM, tf.nn.tanh, trainable=trainable)
+            sigma = tf.layers.dense(l1, A_DIM, tf.nn.softplus, trainable=trainable)
             norm_dist = Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         return norm_dist, params
@@ -125,14 +123,14 @@ class PPO(object):
         return self.sess.run(self.v, {self.tfs: s})[0, 0]
 
 env = gym.make('Pendulum-v0').unwrapped
-ppo = PPO(s_dim=3, a_dim=1)
+ppo = PPO()
 all_ep_r = []
 
 for ep in range(EP_MAX):
     s = env.reset()
     buffer_s, buffer_a, buffer_r = [], [], []
     ep_r = 0
-    for t in range(1, EP_LEN):    # one episode
+    for t in range(EP_LEN):    # in one episode
         env.render()
         a = ppo.choose_action(s)
         s_, r, done, _ = env.step(a)
@@ -143,7 +141,7 @@ for ep in range(EP_MAX):
         ep_r += r
 
         # update ppo
-        if t % (BATCH-1) == 0 or t == EP_LEN-1:
+        if (t+1) % BATCH == 0 or t == EP_LEN-1:
             v_s_ = ppo.get_v(s_)
             discounted_r = []
             for r in buffer_r[::-1]:
@@ -153,7 +151,7 @@ for ep in range(EP_MAX):
 
             bs, ba, br = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r)[:, np.newaxis]
             buffer_s, buffer_a, buffer_r = [], [], []
-            ppo.update(bs, ba, br, m=A_UPDATE_STEPS, b=C_UPDATE_STEPS)
+            ppo.update(bs, ba, br)
     if ep == 0: all_ep_r.append(ep_r)
     else: all_ep_r.append(all_ep_r[-1]*0.9 + ep_r*0.1)
     print(
