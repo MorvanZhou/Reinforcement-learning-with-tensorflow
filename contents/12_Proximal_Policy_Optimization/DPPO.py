@@ -1,11 +1,11 @@
 """
-A simple version of OpenAI's Proximal Policy Optimization (PPO). [http://adsabs.harvard.edu/abs/2017arXiv170706347S]
+A simple version of OpenAI's Proximal Policy Optimization (PPO). [https://arxiv.org/abs/1707.06347]
 
 Distributing workers in parallel to collect data, then stop worker's roll-out and train PPO on collected data.
 Restart workers once PPO is updated.
 
 The global PPO updating rule is adopted from DeepMind's paper (DPPO):
-Emergence of Locomotion Behaviours in Rich Environments (Google Deepmind): [http://adsabs.harvard.edu/abs/2017arXiv170702286H]
+Emergence of Locomotion Behaviours in Rich Environments (Google Deepmind): [https://arxiv.org/abs/1707.02286]
 
 View more on my tutorial website: https://morvanzhou.github.io/tutorials
 
