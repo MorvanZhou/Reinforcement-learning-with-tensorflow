@@ -51,8 +51,8 @@ class DeepQNetwork:
         # consist of [target_net, evaluate_net]
         self._build_net()
 
-        t_params = tf.get_collection('target_net_params')
-        e_params = tf.get_collection('eval_net_params')
+        t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
+        e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
         self.target_replace_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)]
 
         self.sess = tf.Session()
@@ -66,46 +66,34 @@ class DeepQNetwork:
         self.cost_his = []
 
     def _build_net(self):
-        def build_layers(s, c_names, n_l1, w_initializer, b_initializer):
-            with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer, collections=c_names)
-                b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
-                l1 = tf.nn.relu(tf.matmul(s, w1) + b1)
-
-            with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                out = tf.matmul(l1, w2) + b2
-            return out
-
         # ------------------ all inputs ------------------------
         self.s = tf.placeholder(tf.float32, [None, self.n_features], name='s')  # input State
         self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')  # input Next State
         self.r = tf.placeholder(tf.float32, [None, ], name='r')  # input Reward
         self.a = tf.placeholder(tf.int32, [None, ], name='a')  # input Action
 
+        w_initializer, b_initializer = tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)
+
         # ------------------ build evaluate_net ------------------
         with tf.variable_scope('eval_net'):
-            # c_names(collections_names) are the collections to store variables
-            c_names, n_l1, w_initializer, b_initializer = \
-                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 10, \
-                tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)  # config of layers
-            self.q_eval = build_layers(self.s, c_names, n_l1, w_initializer, b_initializer)
+            e1 = tf.layers.dense(self.s, 20, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer)
+            self.q_eval = tf.layers.dense(e1, self.n_actions, kernel_initializer=w_initializer,
+                                          bias_initializer=b_initializer)
 
         # ------------------ build target_net ------------------
         with tf.variable_scope('target_net'):
-            # c_names(collections_names) are the collections to store variables
-            c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
-            self.q_next = build_layers(self.s_, c_names, n_l1, w_initializer, b_initializer)
+            e1 = tf.layers.dense(self.s, 20, tf.nn.relu, kernel_initializer=w_initializer,
+                                 bias_initializer=b_initializer)
+            self.q_next = tf.layers.dense(e1, self.n_actions, kernel_initializer=w_initializer,
+                                          bias_initializer=b_initializer)
 
         with tf.variable_scope('q_target'):
             q_target = self.r + self.gamma * tf.reduce_max(self.q_next, axis=1, name='Qmax_s_')    # shape=(None, )
             self.q_target = tf.stop_gradient(q_target)
-
         with tf.variable_scope('q_eval'):
-            a_one_hot = tf.one_hot(self.a, depth=self.n_actions, dtype=tf.float32)
-            self.q_eval_wrt_a = tf.reduce_sum(self.q_eval * a_one_hot, axis=1)     # shape=(None, )
-
+            a_indices = tf.stack([tf.range(tf.shape(self.a)[0], dtype=tf.int32), self.a], axis=1)
+            self.q_eval_wrt_a = tf.gather_nd(params=self.q_eval, indices=a_indices)    # shape=(None, )
         with tf.variable_scope('loss'):
             self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval_wrt_a, name='TD_error'))
         with tf.variable_scope('train'):
