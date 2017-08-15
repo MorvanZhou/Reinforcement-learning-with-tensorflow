@@ -176,6 +176,9 @@ class DQNPrioritizedReplay:
         self.learn_step_counter = 0
 
         self._build_net()
+        t_params = tf.get_collection('target_net_params')
+        e_params = tf.get_collection('eval_net_params')
+        self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)]
 
         if self.prioritized:
             self.memory = Memory(capacity=memory_size)
@@ -254,14 +257,9 @@ class DQNPrioritizedReplay:
             action = np.random.randint(0, self.n_actions)
         return action
 
-    def _replace_target_params(self):
-        t_params = tf.get_collection('target_net_params')
-        e_params = tf.get_collection('eval_net_params')
-        self.sess.run([tf.assign(t, e) for t, e in zip(t_params, e_params)])
-
     def learn(self):
         if self.learn_step_counter % self.replace_target_iter == 0:
-            self._replace_target_params()
+            self.sess.run(self.replace_target_op)
             print('\ntarget_params_replaced\n')
 
         if self.prioritized:
