@@ -36,7 +36,6 @@ S_DIM, A_DIM = 3, 1         # state and action dimension
 class PPO(object):
     def __init__(self):
         self.sess = tf.Session()
-
         self.tfs = tf.placeholder(tf.float32, [None, S_DIM], 'state')
 
         # critic
@@ -50,16 +49,16 @@ class PPO(object):
         # actor
         pi, pi_params = self._build_anet('pi', trainable=True)
         oldpi, oldpi_params = self._build_anet('oldpi', trainable=False)
-        self.sample_op = tf.squeeze(pi.sample(1), axis=0)  # choosing action
+        self.sample_op = tf.squeeze(pi.sample(1), axis=0)  # operation of choosing action
         self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
 
         self.tfa = tf.placeholder(tf.float32, [None, A_DIM], 'action')
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
         # ratio = tf.exp(pi.log_prob(self.tfa) - oldpi.log_prob(self.tfa))
         ratio = pi.prob(self.tfa) / (oldpi.prob(self.tfa) + 1e-5)
-        surr = ratio * self.tfadv   # surrogate loss
+        surr = ratio * self.tfadv                       # surrogate loss
 
-        self.aloss = -tf.reduce_mean(tf.minimum(
+        self.aloss = -tf.reduce_mean(tf.minimum(        # clipped surrogate objective
             surr,
             tf.clip_by_value(ratio, 1. - EPSILON, 1. + EPSILON) * self.tfadv))
 
@@ -70,12 +69,13 @@ class PPO(object):
         global GLOBAL_UPDATE_COUNTER
         while not COORD.should_stop():
             if GLOBAL_EP < EP_MAX:
-                UPDATE_EVENT.wait()         # wait until get batch of data
-                self.sess.run(self.update_oldpi_op)   # old pi to pi
-                data = [QUEUE.get() for _ in range(QUEUE.qsize())]
+                UPDATE_EVENT.wait()                     # wait until get batch of data
+                self.sess.run(self.update_oldpi_op)     # copy pi to old pi
+                data = [QUEUE.get() for _ in range(QUEUE.qsize())]      # collect data from all workers
                 data = np.vstack(data)
                 s, a, r = data[:, :S_DIM], data[:, S_DIM: S_DIM + A_DIM], data[:, -1:]
                 adv = self.sess.run(self.advantage, {self.tfs: s, self.tfdc_r: r})
+                # update actor and critic in a update loop
                 [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(UPDATE_STEP)]
                 [self.sess.run(self.ctrain_op, {self.tfs: s, self.tfdc_r: r}) for _ in range(UPDATE_STEP)]
                 UPDATE_EVENT.clear()        # updating finished
@@ -136,7 +136,7 @@ class Worker(object):
 
                     bs, ba, br = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r)[:, np.newaxis]
                     buffer_s, buffer_a, buffer_r = [], [], []
-                    QUEUE.put(np.hstack((bs, ba, br)))
+                    QUEUE.put(np.hstack((bs, ba, br)))          # put data in the queue
                     if GLOBAL_UPDATE_COUNTER >= MIN_BATCH_SIZE:
                         ROLLING_EVENT.clear()       # stop collecting data
                         UPDATE_EVENT.set()          # globalPPO update
@@ -155,30 +155,30 @@ class Worker(object):
 if __name__ == '__main__':
     GLOBAL_PPO = PPO()
     UPDATE_EVENT, ROLLING_EVENT = threading.Event(), threading.Event()
-    UPDATE_EVENT.clear()    # no update now
-    ROLLING_EVENT.set()     # start to roll out
+    UPDATE_EVENT.clear()            # not update now
+    ROLLING_EVENT.set()             # start to roll out
     workers = [Worker(wid=i) for i in range(N_WORKER)]
     
     GLOBAL_UPDATE_COUNTER, GLOBAL_EP = 0, 0
     GLOBAL_RUNNING_R = []
     COORD = tf.train.Coordinator()
-    QUEUE = queue.Queue()
+    QUEUE = queue.Queue()           # workers putting data in this queue
     threads = []
-    for worker in workers:  # worker threads
+    for worker in workers:          # worker threads
         t = threading.Thread(target=worker.work, args=())
-        t.start()
+        t.start()                   # training
         threads.append(t)
     # add a PPO updating thread
     threads.append(threading.Thread(target=GLOBAL_PPO.update,))
     threads[-1].start()
     COORD.join(threads)
 
-    # plot reward change and testing
+    # plot reward change and test
     plt.plot(np.arange(len(GLOBAL_RUNNING_R)), GLOBAL_RUNNING_R)
     plt.xlabel('Episode'); plt.ylabel('Moving reward'); plt.ion(); plt.show()
     env = gym.make('Pendulum-v0')
     while True:
         s = env.reset()
-        for t in range(400):
+        for t in range(300):
             env.render()
             s = env.step(GLOBAL_PPO.choose_action(s))[0]
