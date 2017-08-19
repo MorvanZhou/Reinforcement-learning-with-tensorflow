@@ -10,12 +10,11 @@ Emergence of Locomotion Behaviours in Rich Environments (Google Deepmind): [http
 View more on my tutorial website: https://morvanzhou.github.io/tutorials
 
 Dependencies:
-tensorflow r1.2
+tensorflow r1.3
 gym 0.9.2
 """
 
 import tensorflow as tf
-from tensorflow.contrib.distributions import Normal
 import numpy as np
 import matplotlib.pyplot as plt
 import gym, threading, queue
@@ -87,7 +86,7 @@ class PPO(object):
             l1 = tf.layers.dense(self.tfs, 200, tf.nn.relu, trainable=trainable)
             mu = 2 * tf.layers.dense(l1, A_DIM, tf.nn.tanh, trainable=trainable)
             sigma = tf.layers.dense(l1, A_DIM, tf.nn.softplus, trainable=trainable)
-            norm_dist = Normal(loc=mu, scale=sigma)
+            norm_dist = tf.distributions.Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         return norm_dist, params
 

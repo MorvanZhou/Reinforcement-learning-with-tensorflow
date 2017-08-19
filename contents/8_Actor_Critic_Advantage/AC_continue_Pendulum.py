@@ -8,7 +8,7 @@ Cannot converge!!! oscillate!!!
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow 1.0
+tensorflow r1.3
 gym 0.8.0
 """
 
@@ -57,7 +57,7 @@ class Actor(object):
         global_step = tf.Variable(0, trainable=False)
         # self.e = epsilon = tf.train.exponential_decay(2., global_step, 1000, 0.9)
         self.mu, self.sigma = tf.squeeze(mu*2), tf.squeeze(sigma+0.1)
-        self.normal_dist = tf.contrib.distributions.Normal(self.mu, self.sigma)
+        self.normal_dist = tf.distributions.Normal(self.mu, self.sigma)
 
         self.action = tf.clip_by_value(self.normal_dist.sample(1), action_bound[0], action_bound[1])
 

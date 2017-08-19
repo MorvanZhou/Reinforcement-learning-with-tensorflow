@@ -6,7 +6,7 @@ The Pendulum example.
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow 1.0
+tensorflow r1.3
 gym 0.8.0
 """
 
@@ -63,7 +63,7 @@ class ACNet(object):
                 with tf.name_scope('wrap_a_out'):
                     mu, sigma = mu * A_BOUND[1], sigma + 1e-4
 
-                normal_dist = tf.contrib.distributions.Normal(mu, sigma)
+                normal_dist = tf.distributions.Normal(mu, sigma)
 
                 with tf.name_scope('a_loss'):
                     log_prob = normal_dist.log_prob(self.a_his)

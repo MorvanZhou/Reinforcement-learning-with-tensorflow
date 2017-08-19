@@ -13,7 +13,6 @@ gym 0.9.2
 """
 
 import tensorflow as tf
-from tensorflow.contrib.distributions import Normal, kl_divergence
 import numpy as np
 import matplotlib.pyplot as plt
 import gym
@@ -65,7 +64,7 @@ class PPO(object):
                 surr = ratio * self.tfadv
             if METHOD['name'] == 'kl_pen':
                 self.tflam = tf.placeholder(tf.float32, None, 'lambda')
-                kl = tf.stop_gradient(kl_divergence(oldpi, pi))
+                kl = tf.stop_gradient(tf.distributions.kl_divergence(oldpi, pi))
                 self.kl_mean = tf.reduce_mean(kl)
                 self.aloss = -(tf.reduce_mean(surr - self.tflam * kl))
             else:   # clipping method, find this is better
@@ -109,7 +108,7 @@ class PPO(object):
             l1 = tf.layers.dense(self.tfs, 100, tf.nn.relu, trainable=trainable)
             mu = 2 * tf.layers.dense(l1, A_DIM, tf.nn.tanh, trainable=trainable)
             sigma = tf.layers.dense(l1, A_DIM, tf.nn.softplus, trainable=trainable)
-            norm_dist = Normal(loc=mu, scale=sigma)
+            norm_dist = tf.distributions.Normal(loc=mu, scale=sigma)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         return norm_dist, params
 
