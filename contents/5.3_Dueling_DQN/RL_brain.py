@@ -136,10 +136,7 @@ class DuelingDQN:
         sample_index = np.random.choice(self.memory_size, size=self.batch_size)
         batch_memory = self.memory[sample_index, :]
 
-        q_next, q_eval4next,  = self.sess.run(
-            [self.q_next, self.q_eval],
-            feed_dict={self.s_: batch_memory[:, -self.n_features:],    # next observation
-                       self.s: batch_memory[:, -self.n_features:]})    # next observation
+        q_next = self.sess.run(self.q_next, feed_dict={self.s_: batch_memory[:, -self.n_features:]}) # next observation
         q_eval = self.sess.run(self.q_eval, {self.s: batch_memory[:, :self.n_features]})
 
         q_target = q_eval.copy()
