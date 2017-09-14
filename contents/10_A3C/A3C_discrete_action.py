@@ -61,7 +61,7 @@ class ACNet(object):
                 with tf.name_scope('a_loss'):
                     log_prob = tf.reduce_sum(tf.log(self.a_prob) * tf.one_hot(self.a_his, N_A, dtype=tf.float32), axis=1, keep_dims=True)
                     exp_v = log_prob * td
-                    entropy = tf.stop_gradient(-tf.reduce_sum(self.a_prob * tf.log(self.a_prob),
+                    entropy = tf.stop_gradient(-tf.reduce_sum(self.a_prob * tf.log(self.a_prob + 1e-5),
                                                               axis=1, keep_dims=True))  # encourage exploration
                     self.exp_v = ENTROPY_BETA * entropy + exp_v
                     self.a_loss = tf.reduce_mean(-self.exp_v)
