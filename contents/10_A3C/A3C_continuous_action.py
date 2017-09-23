@@ -68,7 +68,7 @@ class ACNet(object):
                 with tf.name_scope('a_loss'):
                     log_prob = normal_dist.log_prob(self.a_his)
                     exp_v = log_prob * td
-                    entropy = tf.stop_gradient(normal_dist.entropy())  # encourage exploration
+                    entropy = normal_dist.entropy()  # encourage exploration
                     self.exp_v = ENTROPY_BETA * entropy + exp_v
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 

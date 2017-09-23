@@ -65,7 +65,7 @@ class Actor(object):
             log_prob = self.normal_dist.log_prob(self.a)  # loss without advantage
             self.exp_v = log_prob * self.td_error  # advantage (TD_error) guided loss
             # Add cross entropy cost to encourage exploration
-            self.exp_v += tf.stop_gradient(0.1*self.normal_dist.entropy())
+            self.exp_v += 0.01*self.normal_dist.entropy()
 
         with tf.name_scope('train'):
             self.train_op = tf.train.AdamOptimizer(lr).minimize(-self.exp_v, global_step)    # min(v) = max(-v)

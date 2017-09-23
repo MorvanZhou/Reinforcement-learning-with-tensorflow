@@ -64,7 +64,7 @@ class PPO(object):
                 surr = ratio * self.tfadv
             if METHOD['name'] == 'kl_pen':
                 self.tflam = tf.placeholder(tf.float32, None, 'lambda')
-                kl = tf.stop_gradient(tf.distributions.kl_divergence(oldpi, pi))
+                kl = tf.distributions.kl_divergence(oldpi, pi)
                 self.kl_mean = tf.reduce_mean(kl)
                 self.aloss = -(tf.reduce_mean(surr - self.tflam * kl))
             else:   # clipping method, find this is better
