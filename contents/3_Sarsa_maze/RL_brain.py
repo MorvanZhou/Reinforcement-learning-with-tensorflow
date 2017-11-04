@@ -16,7 +16,7 @@ class RL(object):
         self.gamma = reward_decay
         self.epsilon = e_greedy
 
-        self.q_table = pd.DataFrame(columns=self.actions)
+        self.q_table = pd.DataFrame(columns=self.actions, dtype=np.float64)
 
     def check_state_exist(self, state):
         if state not in self.q_table.index:
