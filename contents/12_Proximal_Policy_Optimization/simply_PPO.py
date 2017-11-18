@@ -96,7 +96,7 @@ class PPO(object):
                 METHOD['lam'] /= 2
             elif kl > METHOD['kl_target'] * 1.5:
                 METHOD['lam'] *= 2
-            METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # some time explode, this is my method
+            METHOD['lam'] = np.clip(METHOD['lam'], 1e-4, 10)    # sometimes explode, this clipping is my solution
         else:   # clipping method, find this is better (OpenAI's paper)
             [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(A_UPDATE_STEPS)]
 
