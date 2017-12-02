@@ -24,7 +24,7 @@ class QLearningTable:
             # choose best action
             state_action = self.q_table.ix[observation, :]
             state_action = state_action.reindex(np.random.permutation(state_action.index))     # some actions have same value
-            action = state_action.argmax()
+            action = state_action.idxmax()
         else:
             # choose random action
             action = np.random.choice(self.actions)
