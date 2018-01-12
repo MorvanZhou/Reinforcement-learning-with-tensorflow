@@ -117,8 +117,8 @@ class Worker(object):
             s = self.env.reset()
             ep_r = 0
             while True:
-                if self.name == 'W_0':
-                    self.env.render()
+                # if self.name == 'W_0':
+                #     self.env.render()
                 a = self.AC.choose_action(s)
                 s_, r, done, info = self.env.step(a)
                 if done: r = -5
