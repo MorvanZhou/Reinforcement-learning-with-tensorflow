@@ -34,7 +34,7 @@ class RL(object):
         # action selection
         if np.random.rand() < self.epsilon:
             # choose best action
-            state_action = self.q_table.ix[observation, :]
+            state_action = self.q_table.loc[observation, :]
             state_action = state_action.reindex(np.random.permutation(state_action.index))     # some actions have same value
             action = state_action.idxmax()
         else:
@@ -53,12 +53,12 @@ class QLearningTable(RL):
 
     def learn(self, s, a, r, s_):
         self.check_state_exist(s_)
-        q_predict = self.q_table.ix[s, a]
+        q_predict = self.q_table.loc[s, a]
         if s_ != 'terminal':
-            q_target = r + self.gamma * self.q_table.ix[s_, :].max()  # next state is not terminal
+            q_target = r + self.gamma * self.q_table.loc[s_, :].max()  # next state is not terminal
         else:
             q_target = r  # next state is terminal
-        self.q_table.ix[s, a] += self.lr * (q_target - q_predict)  # update
+        self.q_table.loc[s, a] += self.lr * (q_target - q_predict)  # update
 
 
 # on-policy
@@ -69,9 +69,9 @@ class SarsaTable(RL):
 
     def learn(self, s, a, r, s_, a_):
         self.check_state_exist(s_)
-        q_predict = self.q_table.ix[s, a]
+        q_predict = self.q_table.loc[s, a]
         if s_ != 'terminal':
-            q_target = r + self.gamma * self.q_table.ix[s_, a_]  # next state is not terminal
+            q_target = r + self.gamma * self.q_table.loc[s_, a_]  # next state is not terminal
         else:
             q_target = r  # next state is terminal
-        self.q_table.ix[s, a] += self.lr * (q_target - q_predict)  # update
+        self.q_table.loc[s, a] += self.lr * (q_target - q_predict)  # update
