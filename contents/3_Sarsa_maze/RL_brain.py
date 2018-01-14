@@ -34,7 +34,7 @@ class RL(object):
         # action selection
         if np.random.rand() < self.epsilon:
             # choose best action
-            state_action = self.q_table.ix[observation, :]
+            state_action = self.q_table.loc[observation, :]
             state_action = state_action.reindex(np.random.permutation(state_action.index))     # some actions have same value
             action = state_action.idxmax()
         else:
@@ -47,12 +47,12 @@ class RL(object):
 
     def _learn_action(self, s, a, r, s_, next_state_func):
         self.check_state_exist(s_)
-        q_predict = self.q_table.ix[s, a]
+        q_predict = self.q_table.loc[s, a]
         if s_ != 'terminal':
             q_target = r + next_state_func()  # next state is not terminal
         else:
             q_target = r  # next state is terminal
-        self.q_table.ix[s, a] += self.lr * (q_target - q_predict)  # update
+        self.q_table.loc[s, a] += self.lr * (q_target - q_predict)  # update
 
 # off-policy
 class QLearningTable(RL):
@@ -70,3 +70,4 @@ class SarsaTable(RL):
 
     def learn(self, s, a, r, s_, a_):
         self._learn_action(s, a, r, s_, lambda : self.gamma * self.q_table.ix[s_, a_])
+
