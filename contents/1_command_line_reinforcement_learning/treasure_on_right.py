@@ -34,7 +34,7 @@ def build_q_table(n_states, actions):
 def choose_action(state, q_table):
     # This is how to choose an action
     state_actions = q_table.iloc[state, :]
-    if (np.random.uniform() > EPSILON) or (state_actions.all() == 0):  # act non-greedy or state-action have no value
+    if (np.random.uniform() > EPSILON) or ((state_actions == 0).all()):  # act non-greedy or state-action have no value
         action_name = np.random.choice(ACTIONS)
     else:   # act greedy
         action_name = state_actions.idxmax()    # replace argmax to idxmax as argmax means a different function in newer version of pandas
