@@ -13,6 +13,8 @@ gym 0.8.0
 import tensorflow as tf
 import numpy as np
 import gym
+import time
+
 
 np.random.seed(1)
 tf.set_random_seed(1)
@@ -27,7 +29,7 @@ GAMMA = 0.9     # reward discount
 REPLACEMENT = [
     dict(name='soft', tau=0.01),
     dict(name='hard', rep_iter_a=600, rep_iter_c=500)
-][1]            # you can try different target replacement strategies
+][0]            # you can try different target replacement strategies
 MEMORY_CAPACITY = 10000
 BATCH_SIZE = 32
 
@@ -225,6 +227,7 @@ if OUTPUT_GRAPH:
 
 var = 3  # control exploration
 
+t1 = time.time()
 for i in range(MAX_EPISODES):
     s = env.reset()
     ep_reward = 0
@@ -260,3 +263,5 @@ for i in range(MAX_EPISODES):
             if ep_reward > -300:
                 RENDER = True
             break
+
+print('Running time: ', time.time()-t1)
