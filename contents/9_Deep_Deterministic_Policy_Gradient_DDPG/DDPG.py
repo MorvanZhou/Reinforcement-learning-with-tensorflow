@@ -97,7 +97,7 @@ class Actor(object):
         with tf.variable_scope('policy_grads'):
             # ys = policy;
             # xs = policy's parameters;
-            # self.a_grads = the gradients of the policy to get more Q
+            # a_grads = the gradients of the policy to get more Q
             # tf.gradients will calculate dys/dxs with a initial gradients for ys, so this is dq/da * da/dparams
             self.policy_grads = tf.gradients(ys=self.a, xs=self.e_params, grad_ys=a_grads)
 

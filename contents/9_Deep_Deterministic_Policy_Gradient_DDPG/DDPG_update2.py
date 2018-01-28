@@ -1,4 +1,8 @@
 """
+Note: This is a updated version from my previous code,
+for the target network, I use moving average to soft replace target parameters instead using assign function.
+By doing this, it has 20% speed up on my machine (CPU).
+
 Deep Deterministic Policy Gradient (DDPG), Reinforcement Learning.
 DDPG is Actor Critic based algorithm.
 Pendulum example.
@@ -45,29 +49,25 @@ class DDPG(object):
         self.S_ = tf.placeholder(tf.float32, [None, s_dim], 's_')
         self.R = tf.placeholder(tf.float32, [None, 1], 'r')
 
-        ema = tf.train.ExponentialMovingAverage(decay=1 - TAU)
+        self.a = self._build_a(self.S,)
+        q = self._build_c(self.S, self.a, )
+        a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='Actor')
+        c_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='Critic')
+        ema = tf.train.ExponentialMovingAverage(decay=1 - TAU)          # soft replacement
 
         def ema_getter(getter, name, *args, **kwargs):
             return ema.average(getter(name, *args, **kwargs))
 
-        self.a = self._build_a(self.S,)
-        a_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Actor')
-
-        # assign self.a = a in memory when calculating q for td_error,
-        # otherwise the self.a is from Actor when updating Actor
-        q = self._build_c(self.S, self.a,)
-        c_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Critic')
-
-        target_update = [ema.apply(a_params), ema.apply(c_params)]
-        a_ = self._build_a(self.S_, reuse=True, custom_getter=ema_getter)
+        target_update = [ema.apply(a_params), ema.apply(c_params)]      # soft update operation
+        a_ = self._build_a(self.S_, reuse=True, custom_getter=ema_getter)   # replaced target parameters
         q_ = self._build_c(self.S_, a_, reuse=True, custom_getter=ema_getter)
 
-        with tf.control_dependencies(target_update):
+        a_loss = - tf.reduce_mean(q)  # maximize the q
+        self.atrain = tf.train.AdamOptimizer(LR_A).minimize(a_loss, var_list=a_params)
+
+        with tf.control_dependencies(target_update):    # soft replacement happened at here
             q_target = self.R + GAMMA * q_
-            # in the feed_dict for the td_error, the self.a should change to actions in memory
             td_error = tf.losses.mean_squared_error(labels=q_target, predictions=q)
-            a_loss = - tf.reduce_mean(q)  # maximize the q
-            self.atrain = tf.train.AdamOptimizer(LR_A).minimize(a_loss, var_list=a_params)
             self.ctrain = tf.train.AdamOptimizer(LR_C).minimize(td_error, var_list=c_params)
 
         self.sess.run(tf.global_variables_initializer())
@@ -111,7 +111,6 @@ class DDPG(object):
 
 
 ###############################  training  ####################################
-
 
 env = gym.make(ENV_NAME)
 env = env.unwrapped
