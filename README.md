@@ -100,3 +100,26 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
          alt="Patreon"
          height=120></a>
 </div>
+
+
+**Install Conda**
+https://conda.io/docs/installation.html
+
+
+**Conda Cheat Sheet**
+https://conda.io/docs/_downloads/conda-cheatsheet.pdf
+
+
+```
+//OSX or Linux
+conda create -n tensorflow python=3.5
+source activate tensorflow
+conda install pandas matplotlib jupyter notebook scipy scikit-learn
+conda install -c conda-forge tensorflow
+
+//Windows
+conda create -n tensorflow python=3.5
+activate tensorflow
+conda install pandas matplotlib jupyter notebook scipy scikit-learn
+conda install -c conda-forge tensorflow
+```
