@@ -61,13 +61,24 @@ class Maze(tk.Tk, object):
         hell2_center = origin + np.array([UNIT, UNIT * 2])
         self.hell2 = self.canvas.create_rectangle(
             hell2_center[0] - 15, hell2_center[1] - 15,
-            hell2_center[0] + 15, hell2_center[1] + 15,
+            hell2_center[0] + 15, hell2_center[1] + 15 ,
             fill='black')
-
+        # hell
+        hell3_center = origin + np.array([UNIT * 2, UNIT * 3])
+        self.hell3 = self.canvas.create_rectangle(
+            hell3_center[0] - 15, hell3_center[1] - 15,
+            hell3_center[0] + 15, hell3_center[1] + 15,
+            fill='black')
+        # hell
+        hell4_center = origin + np.array([UNIT * 2 , UNIT * 2])
+        self.hell4 = self.canvas.create_rectangle(
+            hell4_center[0] - 15 , hell4_center[1] - 15,
+            hell4_center[0] + 15 , hell4_center[1] + 15,
+            fill='black')
         # create oval
-        oval_center = origin + UNIT * 2
+        oval_center = origin + UNIT * 3
         self.oval = self.canvas.create_oval(
-            oval_center[0] - 15, oval_center[1] - 15,
+            oval_center[0] - 15 , oval_center[1] - 15,
             oval_center[0] + 15, oval_center[1] + 15,
             fill='yellow')
 
@@ -117,7 +128,7 @@ class Maze(tk.Tk, object):
             reward = 1
             done = True
             s_ = 'terminal'
-        elif s_ in [self.canvas.coords(self.hell1), self.canvas.coords(self.hell2)]:
+        elif s_ in [self.canvas.coords(self.hell1), self.canvas.coords(self.hell2), self.canvas.coords(self.hell3), self.canvas.coords(self.hell4)]:
             reward = -1
             done = True
             s_ = 'terminal'
