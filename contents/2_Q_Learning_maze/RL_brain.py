@@ -20,7 +20,7 @@ class QLearningTable:
     def choose_action(self, observation):
         self.check_state_exist(observation)
         # action selection
-        if np.random.uniform() < self.epsilon:
+        if np.random.uniform() > self.epsilon:
             # choose best action
             state_action = self.q_table.loc[observation, :]
             state_action = state_action.reindex(np.random.permutation(state_action.index))     # some actions have same value
@@ -28,6 +28,9 @@ class QLearningTable:
         else:
             # choose random action
             action = np.random.choice(self.actions)
+        if(self.epsilon  > 0.1):
+            self.epsilon -= 0.0005   
+        #print(self.epsilon) # debug of epsilon 
         return action
 
     def learn(self, s, a, r, s_):
