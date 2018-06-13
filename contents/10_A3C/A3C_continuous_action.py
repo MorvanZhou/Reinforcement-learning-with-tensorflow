@@ -6,7 +6,7 @@ The Pendulum example.
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow r1.3
+tensorflow 1.8.0
 gym 0.8.0
 """
 
@@ -73,7 +73,7 @@ class ACNet(object):
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 
                 with tf.name_scope('choose_a'):  # use local params to choose action
-                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=0), A_BOUND[0], A_BOUND[1])
+                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=[0, 1]), A_BOUND[0], A_BOUND[1])
                 with tf.name_scope('local_grad'):
                     self.a_grads = tf.gradients(self.a_loss, self.a_params)
                     self.c_grads = tf.gradients(self.c_loss, self.c_params)
@@ -107,7 +107,7 @@ class ACNet(object):
 
     def choose_action(self, s):  # run by a local
         s = s[np.newaxis, :]
-        return SESS.run(self.A, {self.s: s})[0]
+        return SESS.run(self.A, {self.s: s})
 
 
 class Worker(object):

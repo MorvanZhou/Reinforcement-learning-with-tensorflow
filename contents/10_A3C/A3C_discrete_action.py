@@ -6,7 +6,7 @@ The Cartpole example.
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow 1.0
+tensorflow 1.8.0
 gym 0.8.0
 """
 
