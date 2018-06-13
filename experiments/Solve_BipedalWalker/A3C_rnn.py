@@ -6,8 +6,8 @@ The BipedalWalker example.
 View more on [莫烦Python] : https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow 1.0
-gym 0.8.0
+tensorflow 1.8.0
+gym 0.10.5
 """
 
 import multiprocessing
@@ -47,7 +47,7 @@ class ACNet(object):
         if scope == GLOBAL_NET_SCOPE:   # get global network
             with tf.variable_scope(scope):
                 self.s = tf.placeholder(tf.float32, [None, N_S], 'S')
-                self._build_net(N_A)
+                self._build_net()
                 self.a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope + '/actor')
                 self.c_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope + '/critic')
         else:   # local net, calculate losses
@@ -56,7 +56,7 @@ class ACNet(object):
                 self.a_his = tf.placeholder(tf.float32, [None, N_A], 'A')
                 self.v_target = tf.placeholder(tf.float32, [None, 1], 'Vtarget')
 
-                mu, sigma, self.v = self._build_net(N_A)
+                mu, sigma, self.v = self._build_net()
 
                 td = tf.subtract(self.v_target, self.v, name='TD_error')
                 with tf.name_scope('c_loss'):
@@ -76,7 +76,7 @@ class ACNet(object):
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 
                 with tf.name_scope('choose_a'):  # use local params to choose action
-                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=0), A_BOUND[0], A_BOUND[1])
+                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1)), A_BOUND[0], A_BOUND[1])
 
                 with tf.name_scope('local_grad'):
                     self.a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope + '/actor')
@@ -94,7 +94,7 @@ class ACNet(object):
                     self.update_a_op = OPT_A.apply_gradients(zip(self.a_grads, globalAC.a_params))
                     self.update_c_op = OPT_C.apply_gradients(zip(self.c_grads, globalAC.c_params))
 
-    def _build_net(self, n_a):
+    def _build_net(self):
         w_init = tf.random_normal_initializer(0., .01)
         with tf.variable_scope('critic'):  # only critic controls the rnn update
             cell_size = 128
@@ -125,7 +125,7 @@ class ACNet(object):
     def choose_action(self, s, cell_state):  # run by a local
         s = s[np.newaxis, :]
         a, cell_state = SESS.run([self.A, self.final_state], {self.s: s, self.init_state: cell_state})
-        return a[0], cell_state
+        return a, cell_state
 
 
 class Worker(object):

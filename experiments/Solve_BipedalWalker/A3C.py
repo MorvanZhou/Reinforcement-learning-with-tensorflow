@@ -6,8 +6,8 @@ The BipedalWalker example.
 View more on [莫烦Python] : https://morvanzhou.github.io/tutorials/
 
 Using:
-tensorflow 1.0
-gym 0.8.0
+tensorflow 1.8.0
+gym 0.10.5
 """
 
 import multiprocessing
@@ -26,7 +26,7 @@ N_WORKERS = multiprocessing.cpu_count()
 MAX_GLOBAL_EP = 8000
 GLOBAL_NET_SCOPE = 'Global_Net'
 UPDATE_GLOBAL_ITER = 10
-GAMMA = 0.999
+GAMMA = 0.99
 ENTROPY_BETA = 0.005
 LR_A = 0.00002    # learning rate for actor
 LR_C = 0.0001    # learning rate for critic
@@ -76,7 +76,7 @@ class ACNet(object):
                     self.a_loss = tf.reduce_mean(-self.exp_v)
 
                 with tf.name_scope('choose_a'):  # use local params to choose action
-                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1), axis=0), *A_BOUND)
+                    self.A = tf.clip_by_value(tf.squeeze(normal_dist.sample(1)), *A_BOUND)
                 with tf.name_scope('local_grad'):
                     self.a_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope + '/actor')
                     self.c_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope + '/critic')
@@ -100,7 +100,7 @@ class ACNet(object):
             sigma = tf.layers.dense(l_a, N_A, tf.nn.softplus, kernel_initializer=w_init, name='sigma')
         with tf.variable_scope('critic'):
             l_c = tf.layers.dense(self.s, 500, tf.nn.relu6, kernel_initializer=w_init, name='lc')
-            l_c = tf.layers.dense(l_c, 200, tf.nn.relu6, kernel_initializer=w_init, name='lc2')
+            l_c = tf.layers.dense(l_c, 300, tf.nn.relu6, kernel_initializer=w_init, name='lc2')
             v = tf.layers.dense(l_c, 1, kernel_initializer=w_init, name='v')  # state value
         return mu, sigma, v
 
@@ -113,7 +113,7 @@ class ACNet(object):
 
     def choose_action(self, s):  # run by a local
         s = s[np.newaxis, :]
-        return SESS.run(self.A, {self.s: s})[0]
+        return SESS.run(self.A, {self.s: s})
 
 
 class Worker(object):
