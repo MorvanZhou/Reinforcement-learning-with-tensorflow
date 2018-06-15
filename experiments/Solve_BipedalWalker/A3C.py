@@ -28,7 +28,7 @@ GLOBAL_NET_SCOPE = 'Global_Net'
 UPDATE_GLOBAL_ITER = 10
 GAMMA = 0.99
 ENTROPY_BETA = 0.005
-LR_A = 0.00002    # learning rate for actor
+LR_A = 0.00005    # learning rate for actor
 LR_C = 0.0001    # learning rate for critic
 GLOBAL_RUNNING_R = []
 GLOBAL_EP = 0
@@ -205,5 +205,9 @@ if __name__ == "__main__":
         t.start()
         worker_threads.append(t)
     COORD.join(worker_threads)
-
+    import matplotlib.pyplot as plt
+    plt.plot(GLOBAL_RUNNING_R)
+    plt.xlabel('episode')
+    plt.ylabel('global running reward')
+    plt.show()
 

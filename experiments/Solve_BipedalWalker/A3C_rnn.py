@@ -26,9 +26,9 @@ N_WORKERS = multiprocessing.cpu_count()
 MAX_GLOBAL_EP = 8000
 GLOBAL_NET_SCOPE = 'Global_Net'
 UPDATE_GLOBAL_ITER = 10
-GAMMA = 0.99
-ENTROPY_BETA = 0.005
-LR_A = 0.00001    # learning rate for actor
+GAMMA = 0.9
+ENTROPY_BETA = 0.001
+LR_A = 0.00002    # learning rate for actor
 LR_C = 0.0001    # learning rate for critic
 GLOBAL_RUNNING_R = []
 GLOBAL_EP = 0
@@ -95,9 +95,9 @@ class ACNet(object):
                     self.update_c_op = OPT_C.apply_gradients(zip(self.c_grads, globalAC.c_params))
 
     def _build_net(self):
-        w_init = tf.random_normal_initializer(0., .01)
+        w_init = tf.random_normal_initializer(0., .1)
         with tf.variable_scope('critic'):  # only critic controls the rnn update
-            cell_size = 128
+            cell_size = 126
             s = tf.expand_dims(self.s, axis=1,
                                name='timely_input')  # [time_step, feature] => [time_step, batch, feature]
             rnn_cell = tf.contrib.rnn.BasicRNNCell(cell_size)
@@ -105,12 +105,12 @@ class ACNet(object):
             outputs, self.final_state = tf.nn.dynamic_rnn(
                 cell=rnn_cell, inputs=s, initial_state=self.init_state, time_major=True)
             cell_out = tf.reshape(outputs, [-1, cell_size], name='flatten_rnn_outputs')  # joined state representation
-            l_c = tf.layers.dense(cell_out, 300, tf.nn.relu6, kernel_initializer=w_init, name='lc')
+            l_c = tf.layers.dense(cell_out, 512, tf.nn.relu6, kernel_initializer=w_init, name='lc')
             v = tf.layers.dense(l_c, 1, kernel_initializer=w_init, name='v')  # state value
 
         with tf.variable_scope('actor'):  # state representation is based on critic
             cell_out = tf.stop_gradient(cell_out, name='c_cell_out')  # from what critic think it is
-            l_a = tf.layers.dense(cell_out, 400, tf.nn.relu6, kernel_initializer=w_init, name='la')
+            l_a = tf.layers.dense(cell_out, 512, tf.nn.relu6, kernel_initializer=w_init, name='la')
             mu = tf.layers.dense(l_a, N_A, tf.nn.tanh, kernel_initializer=w_init, name='mu')
             sigma = tf.layers.dense(l_a, N_A, tf.nn.softplus, kernel_initializer=w_init, name='sigma') # restrict variance
         return mu, sigma, v
@@ -233,3 +233,8 @@ if __name__ == "__main__":
         t.start()
         worker_threads.append(t)
     COORD.join(worker_threads)
+    import matplotlib.pyplot as plt
+    plt.plot(GLOBAL_RUNNING_R)
+    plt.xlabel('episode')
+    plt.ylabel('global running reward')
+    plt.show()
