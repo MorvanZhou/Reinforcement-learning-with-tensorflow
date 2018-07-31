@@ -10,7 +10,7 @@ Emergence of Locomotion Behaviours in Rich Environments (Google Deepmind): [http
 View more on my tutorial website: https://morvanzhou.github.io/tutorials
 
 Dependencies:
-tensorflow r1.3
+tensorflow 1.8.0
 gym 0.9.2
 """
 
@@ -18,7 +18,6 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import gym, threading, queue
-import time
 
 EP_MAX = 1000
 EP_LEN = 500
@@ -27,7 +26,7 @@ GAMMA = 0.9                 # reward discount factor
 A_LR = 0.0001               # learning rate for actor
 C_LR = 0.0001               # learning rate for critic
 MIN_BATCH_SIZE = 64         # minimum batch size for updating PPO
-UPDATE_STEP = 10            # loop update operation n-steps
+UPDATE_STEP = 15            # loop update operation n-steps
 EPSILON = 0.2               # for clipping surrogate objective
 GAME = 'CartPole-v0'
 
@@ -51,22 +50,18 @@ class PPONet(object):
         self.ctrain_op = tf.train.AdamOptimizer(C_LR).minimize(self.closs)
 
         # actor
-        self.pi, self.pi_params = self._build_anet('pi', trainable=True)
+        self.pi, pi_params = self._build_anet('pi', trainable=True)
         oldpi, oldpi_params = self._build_anet('oldpi', trainable=False)
         
-        self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(self.pi_params, oldpi_params)]
+        self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
 
-        self.tfa = tf.placeholder(tf.int32, [None,], 'action')
-        
+        self.tfa = tf.placeholder(tf.int32, [None, ], 'action')
         self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
 
-        #debug
-        self.val1 = tf.reduce_sum(self.pi * tf.one_hot(self.tfa, A_DIM, dtype=tf.float32), axis=1, keep_dims=True)
-        self.val2 = tf.reduce_sum(oldpi * tf.one_hot(self.tfa, A_DIM, dtype=tf.float32), axis=1, keep_dims=True)
-        #debug
-        
-        ratio = self.val1/self.val2
-        
+        a_indices = tf.stack([tf.range(tf.shape(self.tfa)[0], dtype=tf.int32), self.tfa], axis=1)
+        pi_prob = tf.gather_nd(params=self.pi, indices=a_indices)   # shape=(None, )
+        oldpi_prob = tf.gather_nd(params=oldpi, indices=a_indices)  # shape=(None, )
+        ratio = pi_prob/oldpi_prob
         surr = ratio * self.tfadv                       # surrogate loss
 
         self.aloss = -tf.reduce_mean(tf.minimum(        # clipped surrogate objective
@@ -82,20 +77,10 @@ class PPONet(object):
             if GLOBAL_EP < EP_MAX:
                 UPDATE_EVENT.wait()                     # wait until get batch of data
                 self.sess.run(self.update_oldpi_op)     # copy pi to old pi
-                s, a, r = [],[],[]
-                for iter in range(QUEUE.qsize()):
-                    data = QUEUE.get()
-                    if iter == 0:
-                        s = data['bs']
-                        a = data['ba']
-                        r = data['br']
-                    else:
-                        s = np.append(s, data['bs'], axis=0)
-                        a = np.append(a, data['ba'], axis=0)
-                        r = np.append(r, data['br'], axis=0)
-
+                data = [QUEUE.get() for _ in range(QUEUE.qsize())]      # collect data from all workers
+                data = np.vstack(data)
+                s, a, r = data[:, :S_DIM], data[:, S_DIM: S_DIM + 1].ravel(), data[:, -1:]
                 adv = self.sess.run(self.advantage, {self.tfs: s, self.tfdc_r: r})
-
                 # update actor and critic in a update loop
                 [self.sess.run(self.atrain_op, {self.tfs: s, self.tfa: a, self.tfadv: adv}) for _ in range(UPDATE_STEP)]
                 [self.sess.run(self.ctrain_op, {self.tfs: s, self.tfdc_r: r}) for _ in range(UPDATE_STEP)]
@@ -104,16 +89,14 @@ class PPONet(object):
                 ROLLING_EVENT.set()         # set roll-out available
 
     def _build_anet(self, name, trainable):
-        w_init = tf.random_normal_initializer(0., .1)
-
         with tf.variable_scope(name):
             l_a = tf.layers.dense(self.tfs, 200, tf.nn.relu, trainable=trainable)
-            a_prob = tf.layers.dense(l_a, A_DIM, tf.nn.softmax, trainable=trainable, name='ap')
+            a_prob = tf.layers.dense(l_a, A_DIM, tf.nn.softmax, trainable=trainable)
         params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=name)
         return a_prob, params
 
     def choose_action(self, s):  # run by a local
-        prob_weights = self.sess.run(self.pi, feed_dict={self.tfs: s[np.newaxis, :]})
+        prob_weights = self.sess.run(self.pi, feed_dict={self.tfs: s[None, :]})
         action = np.random.choice(range(prob_weights.shape[1]),
                                       p=prob_weights.ravel())  # select action w.r.t the actions prob
         return action
@@ -132,28 +115,26 @@ class Worker(object):
     def work(self):
         global GLOBAL_EP, GLOBAL_RUNNING_R, GLOBAL_UPDATE_COUNTER
         while not COORD.should_stop():
-            s = self.env.reset()#new episode
+            s = self.env.reset()
             ep_r = 0
             buffer_s, buffer_a, buffer_r = [], [], []
             for t in range(EP_LEN):
                 if not ROLLING_EVENT.is_set():                  # while global PPO is updating
                     ROLLING_EVENT.wait()                        # wait until PPO is updated
                     buffer_s, buffer_a, buffer_r = [], [], []   # clear history buffer, use new policy to collect data
-                
                 a = self.ppo.choose_action(s)
                 s_, r, done, _ = self.env.step(a)
-                if done: r = -5
+                if done: r = -10
                 buffer_s.append(s)
                 buffer_a.append(a)
-                buffer_r.append((r + 8) / 8)                    # normalize reward, find to be useful
+                buffer_r.append(r-1)                            # 0 for not down, -11 for down. Reward engineering
                 s = s_
                 ep_r += r
 
-                GLOBAL_UPDATE_COUNTER += 1               # count to minimum batch size, no need to wait other workers
+                GLOBAL_UPDATE_COUNTER += 1                      # count to minimum batch size, no need to wait other workers
                 if t == EP_LEN - 1 or GLOBAL_UPDATE_COUNTER >= MIN_BATCH_SIZE or done:
-                    
                     if done:
-                        v_s_ = 0 #episode ends
+                        v_s_ = 0                                # end of episode
                     else:
                         v_s_ = self.ppo.get_v(s_)
                     
@@ -162,33 +143,25 @@ class Worker(object):
                         v_s_ = r + GAMMA * v_s_
                         discounted_r.append(v_s_)
                     discounted_r.reverse()
-        
-                    bs, ba, br = np.vstack(buffer_s), np.array(buffer_a), np.array(discounted_r)[:, np.newaxis]
-                    
+
+                    bs, ba, br = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r)[:, None]
                     buffer_s, buffer_a, buffer_r = [], [], []
-                    
-                    q_in = dict([('bs', bs), ('ba', ba), ('br', br)])
-#                    q_in = dict([('bs', list(bs)), ('ba', list(ba)), ('br', list(br))])
-
-                    QUEUE.put(q_in)
-
+                    QUEUE.put(np.hstack((bs, ba, br)))          # put data in the queue
                     if GLOBAL_UPDATE_COUNTER >= MIN_BATCH_SIZE:
                         ROLLING_EVENT.clear()       # stop collecting data
                         UPDATE_EVENT.set()          # globalPPO update
-                    
+
                     if GLOBAL_EP >= EP_MAX:         # stop training
                         COORD.request_stop()
                         break
         
-                    if done:break
+                    if done: break
 
             # record reward changes, plot later
             if len(GLOBAL_RUNNING_R) == 0: GLOBAL_RUNNING_R.append(ep_r)
             else: GLOBAL_RUNNING_R.append(GLOBAL_RUNNING_R[-1]*0.9+ep_r*0.1)
             GLOBAL_EP += 1
-            print("EP", GLOBAL_EP,'|W%i' % self.wid, '|step %i' %t, '|Ep_r: %.2f' % ep_r,)
-            np.save("Global_return",GLOBAL_RUNNING_R)
-            np.savez("PI_PARA",self.ppo.sess.run(GLOBAL_PPO.pi_params))
+            print('{0:.1f}%'.format(GLOBAL_EP/EP_MAX*100), '|W%i' % self.wid,  '|Ep_r: %.2f' % ep_r,)
 
 
 if __name__ == '__main__':
@@ -197,9 +170,7 @@ if __name__ == '__main__':
     UPDATE_EVENT.clear()            # not update now
     ROLLING_EVENT.set()             # start to roll out
     workers = [Worker(wid=i) for i in range(N_WORKER)]
-    
-    start = time.time()
-    
+
     GLOBAL_UPDATE_COUNTER, GLOBAL_EP = 0, 0
     GLOBAL_RUNNING_R = []
     COORD = tf.train.Coordinator()
@@ -213,9 +184,6 @@ if __name__ == '__main__':
     threads.append(threading.Thread(target=GLOBAL_PPO.update,))
     threads[-1].start()
     COORD.join(threads)
-
-    end = time.time()
-    print "Total time ", (end - start)
 
     # plot reward change and test
     plt.plot(np.arange(len(GLOBAL_RUNNING_R)), GLOBAL_RUNNING_R)

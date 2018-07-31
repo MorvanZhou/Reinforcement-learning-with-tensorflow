@@ -124,7 +124,7 @@ class Worker(object):
                 s = s_
                 ep_r += r
 
-                GLOBAL_UPDATE_COUNTER += 1               # count to minimum batch size, no need to wait other workers
+                GLOBAL_UPDATE_COUNTER += 1                      # count to minimum batch size, no need to wait other workers
                 if t == EP_LEN - 1 or GLOBAL_UPDATE_COUNTER >= MIN_BATCH_SIZE:
                     v_s_ = self.ppo.get_v(s_)
                     discounted_r = []                           # compute discounted reward
