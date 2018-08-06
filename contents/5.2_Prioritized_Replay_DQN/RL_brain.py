@@ -17,10 +17,10 @@ tf.set_random_seed(1)
 
 class SumTree(object):
     """
-    This SumTree code is modified version and the original code is from: 
+    This SumTree code is a modified version and the original code is from:
     https://github.com/jaara/AI-blog/blob/master/SumTree.py
 
-    Story the data with it priority in tree and data frameworks.
+    Story data with its priority in the tree.
     """
     data_pointer = 0
 
@@ -88,7 +88,7 @@ class SumTree(object):
 
 class Memory(object):  # stored as ( s, a, r, s_ ) in SumTree
     """
-    This SumTree code is modified version and the original code is from:
+    This Memory class is modified based on the original code from:
     https://github.com/jaara/AI-blog/blob/master/Seaquest-DDQN-PER.py
     """
     epsilon = 0.01  # small amount to avoid zero priority
