@@ -129,7 +129,7 @@ class CuriosityNet:
         bs, ba, br, bs_ = batch_memory[:, :self.n_s], batch_memory[:, self.n_s], \
             batch_memory[:, self.n_s + 1], batch_memory[:, -self.n_s:]
         self.sess.run(self.dqn_train, feed_dict={self.tfs: bs, self.tfa: ba, self.tfr: br, self.tfs_: bs_})
-        if self.learn_step_counter % 1000 == 0:
+        if self.learn_step_counter % 1000 == 0:     # delay training in order to stay curious
             self.sess.run(self.dyn_train, feed_dict={self.tfs: bs, self.tfa: ba, self.tfs_: bs_})
         self.learn_step_counter += 1
 
