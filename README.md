@@ -33,6 +33,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
     * [A3C](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/10_A3C)
     * [Dyna-Q](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/11_Dyna_Q)
     * [Proximal Policy Optimization (PPO)](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/12_Proximal_Policy_Optimization)
+    * [Curiosity Model](/contents/Curiosity_Model)
 * [Some of my experiments](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments)
     * [2D Car](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments/2D_car)
     * [Robot arm](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments/Robot_arm)
@@ -80,6 +81,12 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
 
 <a href="https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/12_Proximal_Policy_Optimization">
     <img class="course-image" src="https://morvanzhou.github.io/static/results/reinforcement-learning/6-4-3.png">
+</a>
+
+### [Curiosity Model](/contents/Curiosity_Model)
+
+<a href="/contents/Curiosity_Model">
+    <img class="course-image" src="/contents/Curiosity_Model/Curiosity.png">
 </a>
 
 # Donation
