@@ -33,7 +33,7 @@ In these tutorials for reinforcement learning, it covers from the basic RL algor
     * [A3C](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/10_A3C)
     * [Dyna-Q](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/11_Dyna_Q)
     * [Proximal Policy Optimization (PPO)](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/contents/12_Proximal_Policy_Optimization)
-    * [Curiosity Model](/contents/Curiosity_Model)
+    * [Curiosity Model](/contents/Curiosity_Model), [Random Network Distillation (RND)](/contents/Curiosity_Model/Random_Network_Distillation.py)
 * [Some of my experiments](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments)
     * [2D Car](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments/2D_car)
     * [Robot arm](https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/tree/master/experiments/Robot_arm)
