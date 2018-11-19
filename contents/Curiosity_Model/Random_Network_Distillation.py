@@ -1,4 +1,4 @@
-"""This is a simple implementation of [Large-Scale Study of Curiosity-Driven Learning](https://arxiv.org/abs/1808.04355)"""
+"""This is a simple implementation of [Exploration by Random Network Distillation](https://arxiv.org/abs/1810.12894)"""
 
 import numpy as np
 import tensorflow as tf
@@ -12,8 +12,8 @@ class CuriosityNet:
             n_a,
             n_s,
             lr=0.01,
-            gamma=0.98,
-            epsilon=0.95,
+            gamma=0.95,
+            epsilon=1.,
             replace_target_iter=300,
             memory_size=10000,
             batch_size=128,
@@ -27,6 +27,7 @@ class CuriosityNet:
         self.replace_target_iter = replace_target_iter
         self.memory_size = memory_size
         self.batch_size = batch_size
+        self.s_encode_size = 1000       # give a hard job for predictor to learn
 
         # total learning step
         self.learn_step_counter = 0
@@ -34,7 +35,7 @@ class CuriosityNet:
 
         # initialize zero memory [s, a, r, s_]
         self.memory = np.zeros((self.memory_size, n_s * 2 + 2))
-        self.tfs, self.tfa, self.tfr, self.tfs_, self.dyn_train, self.dqn_train, self.q, self.int_r = \
+        self.tfs, self.tfa, self.tfr, self.tfs_, self.pred_train, self.dqn_train, self.q = \
             self._build_nets()
 
         t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
@@ -56,30 +57,30 @@ class CuriosityNet:
         tfr = tf.placeholder(tf.float32, [None, ], name="ext_r")        # extrinsic reward
         tfs_ = tf.placeholder(tf.float32, [None, self.n_s], name="s_")  # input Next State
 
-        # dynamics net
-        dyn_s_, curiosity, dyn_train = self._build_dynamics_net(tfs, tfa, tfs_)
+        # fixed random net
+        with tf.variable_scope("random_net"):
+            rand_encode_s_ = tf.layers.dense(tfs_, self.s_encode_size)
+
+        # predictor
+        ri, pred_train = self._build_predictor(tfs_, rand_encode_s_)
 
         # normal RL model
-        total_reward = tf.add(curiosity, tfr, name="total_r")
-        q, dqn_loss, dqn_train = self._build_dqn(tfs, tfa, total_reward, tfs_)
-        return tfs, tfa, tfr, tfs_, dyn_train, dqn_train, q, curiosity
+        q, dqn_loss, dqn_train = self._build_dqn(tfs, tfa, ri, tfr, tfs_)
+        return tfs, tfa, tfr, tfs_, pred_train, dqn_train, q
 
-    def _build_dynamics_net(self, s, a, s_):
-        with tf.variable_scope("dyn_net"):
-            float_a = tf.expand_dims(tf.cast(a, dtype=tf.float32, name="float_a"), axis=1, name="2d_a")
-            sa = tf.concat((s, float_a), axis=1, name="sa")
-            encoded_s_ = s_                # here we use s_ as the encoded s_
+    def _build_predictor(self, s_, rand_encode_s_):
+        with tf.variable_scope("predictor"):
+            net = tf.layers.dense(s_, 128, tf.nn.relu)
+            out = tf.layers.dense(net, self.s_encode_size)
 
-            dyn_l = tf.layers.dense(sa, 32, activation=tf.nn.relu)
-            dyn_s_ = tf.layers.dense(dyn_l, self.n_s)  # predicted s_
         with tf.name_scope("int_r"):
-            squared_diff = tf.reduce_sum(tf.square(encoded_s_ - dyn_s_), axis=1)  # intrinsic reward
+            ri = squared_diff = tf.reduce_sum(tf.square(rand_encode_s_ - out), axis=1)  # intrinsic reward
+        train_op = tf.train.RMSPropOptimizer(self.lr, name="predictor_opt").minimize(
+            squared_diff, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "predictor"))
 
-        # It is better to reduce the learning rate in order to stay curious
-        train_op = tf.train.RMSPropOptimizer(self.lr, name="dyn_opt").minimize(squared_diff)
-        return dyn_s_, squared_diff, train_op
+        return ri, train_op
 
-    def _build_dqn(self, s, a, r, s_):
+    def _build_dqn(self, s, a, ri, re, s_):
         with tf.variable_scope('eval_net'):
             e1 = tf.layers.dense(s, 128, tf.nn.relu)
             q = tf.layers.dense(e1, self.n_a, name="q")
@@ -88,7 +89,7 @@ class CuriosityNet:
             q_ = tf.layers.dense(t1, self.n_a, name="q_")
 
         with tf.variable_scope('q_target'):
-            q_target = r + self.gamma * tf.reduce_max(q_, axis=1, name="Qmax_s_")
+            q_target = re + ri + self.gamma * tf.reduce_max(q_, axis=1, name="Qmax_s_")
 
         with tf.variable_scope('q_wrt_a'):
             a_indices = tf.stack([tf.range(tf.shape(a)[0], dtype=tf.int32), a], axis=1)
@@ -131,8 +132,8 @@ class CuriosityNet:
         bs, ba, br, bs_ = batch_memory[:, :self.n_s], batch_memory[:, self.n_s], \
             batch_memory[:, self.n_s + 1], batch_memory[:, -self.n_s:]
         self.sess.run(self.dqn_train, feed_dict={self.tfs: bs, self.tfa: ba, self.tfr: br, self.tfs_: bs_})
-        if self.learn_step_counter % 1000 == 0:     # delay training in order to stay curious
-            self.sess.run(self.dyn_train, feed_dict={self.tfs: bs, self.tfa: ba, self.tfs_: bs_})
+        if self.learn_step_counter % 100 == 0:     # delay training in order to stay curious
+            self.sess.run(self.pred_train, feed_dict={self.tfs_: bs_})
         self.learn_step_counter += 1
 
 
@@ -145,7 +146,7 @@ for epi in range(200):
     s = env.reset()
     steps = 0
     while True:
-        env.render()
+        # env.render()
         a = dqn.choose_action(s)
         s_, r, done, info = env.step(a)
         dqn.store_transition(s, a, r, s_)
