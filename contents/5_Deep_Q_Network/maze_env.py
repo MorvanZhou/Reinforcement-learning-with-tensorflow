@@ -40,11 +40,11 @@ class Maze(tk.Tk, object):
                            width=MAZE_W * UNIT)
 
         # create grids
-        for c in range(0, MAZE_W * UNIT, UNIT):
+        for c in range(0, MAZE_H * UNIT, UNIT):
             x0, y0, x1, y1 = c, 0, c, MAZE_H * UNIT
             self.canvas.create_line(x0, y0, x1, y1)
-        for r in range(0, MAZE_H * UNIT, UNIT):
-            x0, y0, x1, y1 = 0, r, MAZE_H * UNIT, r
+        for r in range(0, MAZE_W * UNIT, UNIT):
+            x0, y0, x1, y1 = 0, r, MAZE_W * UNIT, r
             self.canvas.create_line(x0, y0, x1, y1)
 
         # create origin
