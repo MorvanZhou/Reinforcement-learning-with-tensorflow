@@ -119,7 +119,7 @@ class Critic(object):
 
         with tf.variable_scope('Critic'):
             # Input (s, a), output q
-            self.a = a
+            self.a = tf.stop_gradient(a)    # stop critic update flows to actor
             self.q = self._build_net(S, self.a, 'eval_net', trainable=True)
 
             # Input (s_, a_), output q_ for q_target
