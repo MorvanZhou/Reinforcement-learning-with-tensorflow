@@ -74,9 +74,9 @@ class CuriosityNet:
             out = tf.layers.dense(net, self.s_encode_size)
 
         with tf.name_scope("int_r"):
-            ri = squared_diff = tf.reduce_sum(tf.square(rand_encode_s_ - out), axis=1)  # intrinsic reward
+            ri = tf.reduce_sum(tf.square(rand_encode_s_ - out), axis=1)  # intrinsic reward
         train_op = tf.train.RMSPropOptimizer(self.lr, name="predictor_opt").minimize(
-            squared_diff, var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "predictor"))
+            tf.reduce_mean(ri), var_list=tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "predictor"))
 
         return ri, train_op
 

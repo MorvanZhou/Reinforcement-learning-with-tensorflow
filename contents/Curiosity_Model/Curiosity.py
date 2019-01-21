@@ -76,7 +76,7 @@ class CuriosityNet:
             squared_diff = tf.reduce_sum(tf.square(encoded_s_ - dyn_s_), axis=1)  # intrinsic reward
 
         # It is better to reduce the learning rate in order to stay curious
-        train_op = tf.train.RMSPropOptimizer(self.lr, name="dyn_opt").minimize(squared_diff)
+        train_op = tf.train.RMSPropOptimizer(self.lr, name="dyn_opt").minimize(tf.reduce_mean(squared_diff))
         return dyn_s_, squared_diff, train_op
 
     def _build_dqn(self, s, a, r, s_):
