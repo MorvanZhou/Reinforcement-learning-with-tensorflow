@@ -1,14 +1,11 @@
 """
 Reinforcement learning maze example.
-
 Red rectangle:          explorer.
 Black rectangles:       hells       [reward = -1].
 Yellow bin circle:      paradise    [reward = +1].
 All other states:       ground      [reward = 0].
-
 This script is the main part which controls the update method of this example.
 The RL is in RL_brain.py.
-
 View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
@@ -17,7 +14,7 @@ from RL_brain import QLearningTable
 
 
 def update():
-    for episode in range(100):
+    for episode in range(100000):
         # initial observation
         observation = env.reset()
 
