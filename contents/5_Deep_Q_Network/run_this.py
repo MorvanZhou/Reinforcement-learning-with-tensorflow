@@ -5,26 +5,28 @@ from RL_brain import DeepQNetwork
 def run_maze():
     step = 0
     for episode in range(300):
-        # initial observation
-        observation = env.reset()
+        # initial state
+        state = env.reset()
 
         while True:
             # fresh env
             env.render()
 
-            # RL choose action based on observation
-            action = RL.choose_action(observation)
+            # RL choose action based on state
+            action = RL.choose_action(state)
 
-            # RL take action and get next observation and reward
-            observation_, reward, done = env.step(action)
+            # RL take action and get next state and reward
+            state_, reward, done = env.step(action)
 
-            RL.store_transition(observation, action, reward, observation_)
+            RL.store_transition(state, action, reward, state_)
 
+            # 结合learn方法的实现来看，tf.session.run方法中GPU加速的部分应该是矩阵运算.
+            # 而且应该不是异步方法，由于run方法只跑一趟只进行一次参数更新，所以这里的learn方法实际也就只进行了一次参数更新
             if (step > 200) and (step % 5 == 0):
                 RL.learn()
 
-            # swap observation
-            observation = observation_
+            # swap state
+            state = state_
 
             # break while loop when end of this episode
             if done:

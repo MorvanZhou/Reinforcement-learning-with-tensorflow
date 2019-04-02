@@ -18,24 +18,24 @@ from RL_brain import QLearningTable
 
 def update():
     for episode in range(100):
-        # initial observation
-        observation = env.reset()
+        # initial state
+        state = env.reset()
 
         while True:
             # fresh env
             env.render()
 
-            # RL choose action based on observation
-            action = RL.choose_action(str(observation))
+            # RL choose action based on state
+            action = RL.choose_action(str(state))
 
-            # RL take action and get next observation and reward
-            observation_, reward, done = env.step(action)
+            # RL take action and get next state and reward
+            state_, reward, done = env.step(action)
 
             # RL learn from this transition
-            RL.learn(str(observation), action, reward, str(observation_))
+            RL.learn(str(state), action, reward, str(state_))
 
-            # swap observation
-            observation = observation_
+            # swap state
+            state = state_
 
             # break while loop when end of this episode
             if done:
