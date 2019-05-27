@@ -74,6 +74,7 @@ class Actor(object):
 
         self.e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Actor/eval_net')
         self.t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Actor/target_net')
+        self.replace = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)]
 
     def _build_net(self, s, scope, trainable):
         with tf.variable_scope(scope):
@@ -97,7 +98,7 @@ class Actor(object):
     def learn(self, s):   # batch update
         self.sess.run(self.train_op, feed_dict={S: s})
         if self.t_replace_counter % self.t_replace_iter == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
+            self.sess.run(self.replace)
         self.t_replace_counter += 1
 
     def choose_action(self, s):
@@ -145,6 +146,7 @@ class Critic(object):
 
         with tf.variable_scope('a_grad'):
             self.a_grads = tf.gradients(self.q, a)[0]   # tensor of gradients of each sample (None, a_dim)
+        self.replace = [tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)]
 
     def _build_net(self, s, a, scope, trainable):
         with tf.variable_scope(scope):
@@ -170,7 +172,7 @@ class Critic(object):
     def learn(self, s, a, r, s_):
         self.sess.run(self.train_op, feed_dict={S: s, self.a: a, R: r, S_: s_})
         if self.t_replace_counter % self.t_replace_iter == 0:
-            self.sess.run([tf.assign(t, e) for t, e in zip(self.t_params, self.e_params)])
+            self.sess.run(self.replace)
         self.t_replace_counter += 1
 
 
