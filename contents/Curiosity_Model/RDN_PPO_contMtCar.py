@@ -19,8 +19,9 @@ import sklearn.preprocessing
 from sklearn.kernel_approximation import RBFSampler
 
 class RunningStats(object):
-    # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
+    # This class which computes global stats is adapted & modified from:
     # https://github.com/openai/baselines/blob/master/baselines/common/running_mean_std.py
+    # https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
     def __init__(self, epsilon=1e-4, shape=()):
         self.mean = np.zeros(shape, 'float64')
         self.var = np.ones(shape, 'float64')
@@ -167,6 +168,8 @@ class PPO(object):
         return self.sess.run(self.predictor_loss, {self.s_: s_})
 
     def add_vtarg_and_adv(self, R, done, V, v_s_, gamma, lam):
+        # This function is adapted & modified from:
+        # https://github.com/openai/baselines/blob/master/baselines/ppo1/pposgd_simple.py
         # Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
         # last element is only used for last vtarg, but we already zeroed it if last new = 1
         done = np.append(done, 0)
@@ -233,6 +236,9 @@ def state_next_normalize(sample_size, running_stats_s_):
   running_stats_s_.update(np.array(buffer_s_))
 
 if state_ftr == True:
+# ----------
+    # The following code for state featurization is adapted & modified from dennybritz's repository located at:
+    # https://github.com/dennybritz/reinforcement-learning/blob/master/PolicyGradient/Continuous%20MountainCar%20Actor%20Critic%20Solution.ipynb
     # Feature Preprocessing: Normalize to zero mean and unit variance
     # We use a few samples from the observation space to do this
     states = np.array([env.observation_space.sample() for x in range(sample_size)]) # pre-trained, states preprocessing
@@ -256,7 +262,7 @@ if state_ftr == True:
         scaled = scaler.transform([state]) # Perform standardization by centering and scaling
         featurized = featurizer.transform(scaled) # Transform X separately by each transformer, concatenate results.
         return featurized[0]
-
+# ----------
     def featurize_batch_state(batch_states):
         fs_list = []
         for s in batch_states:
