@@ -1,7 +1,7 @@
 """
-Random Distillation Network (RDN) with Proximal Policy Optimization (PPO) implentation in Tensorflow.
+Random Network Distillation (RND) with Proximal Policy Optimization (PPO) implentation in Tensorflow.
 This is a continuous action version which solves the mountain car continuous problem (MountainCarContinuous-v0).
-The RDN helps learning with curiosity driven exploration.
+The RND helps learning with curiosity driven exploration.
 """
 
 import tensorflow as tf
@@ -55,8 +55,8 @@ class PPO(object):
         self.s = tf.placeholder(tf.float32, [None, S_DIM], 'state')
         self.s_ = tf.placeholder(tf.float32, [None, next_S_DIM], 'state_')
 
-        # RDN
-        with tf.variable_scope('RDN'):
+        # RND
+        with tf.variable_scope('RND'):
           with tf.variable_scope('target'):
             r_w = tf.random_normal_initializer() # must be random normal
             # Fixed target network encodes state to features
@@ -197,7 +197,7 @@ s_CLIP = 10 # clip for state buffer
 next_s_CLIP = 5 # clip for next state's buffer
 r_CLIP = 1 # clip for extrinsic reward, note that intrinsic rewards are not clip.
 
-encode_features = 10000 # number of output for RDN predictor's network
+encode_features = 10000 # number of output for RND predictor's network
 
 # Hyper parameters for computation of TD lambda return and policy advantage using GAE
 GAMMA = 0.999 #0.95 #0.95 # discount factor for extrinsic reward
@@ -217,7 +217,7 @@ if state_ftr == True:
 else:
     S_DIM, next_S_DIM, A_DIM = 2, 2, 1 # MountainCarContinuous-v0, not featurize
 
-state_next_normal = True # normalize s_ for RDN's target & predictor networks
+state_next_normal = True # normalize s_ for RND's target & predictor networks
 
 start_time = time.time()
 
@@ -257,7 +257,7 @@ if state_ftr == True:
         scaler.transform(states)) # Perform standardization by centering and scaling
 
     # state featurization of state(s) only,
-    # not used on s_ for RDN's target & predictor networks
+    # not used on s_ for RND's target & predictor networks
     def featurize_state(state):
         scaled = scaler.transform([state]) # Perform standardization by centering and scaling
         featurized = featurizer.transform(scaled) # Transform X separately by each transformer, concatenate results.
