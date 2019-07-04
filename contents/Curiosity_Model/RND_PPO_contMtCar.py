@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Random Network Distillation (RND) with Proximal Policy Optimization (PPO) implentation in Tensorflow.
 This is a continuous action version which solves the mountain car continuous problem (MountainCarContinuous-v0).
@@ -46,30 +47,24 @@ class RunningStats(object):
         self.mean = new_mean
         self.var = new_var
         self.std = np.maximum(np.sqrt(self.var), 1e-6)
-        #self.std = np.sqrt(np.maximum(self.var, 1e-2))
         self.count = batch_count + self.count
 
-class PPO(object):
-    def __init__(self, sess):
-        self.sess = sess
+class RND_PPO(object):
+    def __init__(self, tf_operation_level_seed):
+
         self.s = tf.placeholder(tf.float32, [None, S_DIM], 'state')
         self.s_ = tf.placeholder(tf.float32, [None, next_S_DIM], 'state_')
 
         # RND
         with tf.variable_scope('RND'):
           with tf.variable_scope('target'):
-            r_w = tf.random_normal_initializer() # must be random normal
+            r_w = tf.random_normal_initializer(seed=tf_operation_level_seed)
             # Fixed target network encodes state to features
             # Network randomly initialized once but never trained, params remain fixed, trainable=False
             self.target_out = tf.layers.dense(self.s_, encode_features, kernel_initializer = r_w, name='target_out', trainable=False)
         # predictor network
           with tf.variable_scope('predictor'):
-
-            #p_w = tf.zeros_initializer()
-            p_w = tf.random_normal_initializer()
-            #p_w = tf.glorot_uniform_initializer()
-            #p_w = tf.glorot_normal_initializer()
-
+            p_w = tf.random_normal_initializer(seed=tf_operation_level_seed+1)
             self.predictor_out = tf.layers.dense(self.s_, encode_features, kernel_initializer = p_w, name='predictor_out', trainable=True)
             # self.predictor_loss is also the intrinsic reward
             self.predictor_loss = tf.reduce_sum(tf.square(self.target_out - self.predictor_out), axis=1)
@@ -77,68 +72,61 @@ class PPO(object):
         with tf.variable_scope('PPO'):
           # critic
           with tf.variable_scope('critic'):
-
-            #c_w = tf.zeros_initializer()
-            c_w = tf.random_normal_initializer()
-            #c_w = tf.glorot_uniform_initializer()
-            #c_w = tf.glorot_normal_initializer()
-
-            self.v = tf.layers.dense(self.s, 1, kernel_initializer = c_w, name='val', trainable=True)
-            self.tfdc_r = tf.placeholder(tf.float32, [None, 1], 'discounted_r')
-            self.advantage = self.tfdc_r - self.v
-            self.closs = tf.reduce_mean(tf.square(self.advantage))
-
-            # critic network for intrinsic reward
-            self.v_i = tf.layers.dense(self.s, 1, kernel_initializer = c_w, name='val_i', trainable=True)
-            self.tfdc_r_i = tf.placeholder(tf.float32, [None, 1], 'discounted_r_i')
-            self.advantage_i = self.tfdc_r_i - self.v_i
-            self.closs_i = tf.reduce_mean(tf.square(self.advantage_i))
-
-            self.total_closs = self.closs + self.closs_i
+            c_w = tf.random_normal_initializer(seed=tf_operation_level_seed+2)
+            with tf.variable_scope('critic_extrinsic'):
+                # critic network for extrinsic reward
+                self.v = tf.layers.dense(self.s, 1, kernel_initializer = c_w, name='val', trainable=True)
+                self.tfdc_r = tf.placeholder(tf.float32, [None, 1], 'discounted_r')
+                self.advantage = self.tfdc_r - self.v
+                self.closs = tf.reduce_mean(tf.square(self.advantage))
+            with tf.variable_scope('critic_intrinsic'):
+                # critic network for intrinsic reward
+                self.v_i = tf.layers.dense(self.s, 1, kernel_initializer = c_w, name='val_i', trainable=True)
+                self.tfdc_r_i = tf.placeholder(tf.float32, [None, 1], 'discounted_r_i')
+                self.advantage_i = self.tfdc_r_i - self.v_i
+                self.closs_i = tf.reduce_mean(tf.square(self.advantage_i))
+            with tf.variable_scope('total_critic_loss'):
+                self.total_closs = self.closs + self.closs_i
 
           # actor
-          pi, pi_params = self._build_anet('pi', trainable=True)
-          oldpi, oldpi_params = self._build_anet('oldpi', trainable=False) # trainable=False
-          with tf.variable_scope('sample_action'):
-            self.sample_op = tf.squeeze(pi.sample(1), axis=0) # choosing action
-          with tf.variable_scope('update_oldpi'):
-            self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
-          with tf.variable_scope('surrogate_aloss'):
-            self.tfa = tf.placeholder(tf.float32, [None, A_DIM], 'action')
-            self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
-            ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
-            surr = ratio * self.tfadv
-            self.aloss = -tf.reduce_mean(tf.minimum(surr,
-                                                    tf.clip_by_value(ratio, 1.-epsilon, 1.+epsilon)*self.tfadv))
+          with tf.variable_scope('actor'):
+            pi, pi_params = self._build_anet('pi', trainable=True)
+            oldpi, oldpi_params = self._build_anet('old_pi', trainable=False) # trainable=False
+            with tf.variable_scope('sample_action'):
+              self.sample_op = tf.squeeze(pi.sample(1), axis=0) # choosing action
+            with tf.variable_scope('update_old_pi'):
+              self.update_oldpi_op = [oldp.assign(p) for p, oldp in zip(pi_params, oldpi_params)]
+            with tf.variable_scope('surrogate_actor_loss'):
+              self.tfa = tf.placeholder(tf.float32, [None, A_DIM], 'action')
+              self.tfadv = tf.placeholder(tf.float32, [None, 1], 'advantage')
+              ratio = pi.prob(self.tfa) / oldpi.prob(self.tfa)
+              surr = ratio * self.tfadv
+              self.aloss = -tf.reduce_mean(tf.minimum(surr,
+                                                      tf.clip_by_value(ratio, 1.-epsilon, 1.+epsilon)*self.tfadv))
 
-          with tf.variable_scope('entropy'):
-            entropy = -tf.reduce_mean(pi.entropy()) # Compute the differential entropy of the multivariate normal.
+            with tf.variable_scope('entropy'):
+              entropy = -tf.reduce_mean(pi.entropy()) # Compute the differential entropy of the multivariate normal.
 
         with tf.variable_scope('total_loss'):
             self.total_loss = tf.reduce_mean(self.predictor_loss) + self.total_closs*c_loss_coeff + self.aloss
         with tf.variable_scope('train'):
             self.train_op = tf.train.AdamOptimizer(TL_LR).minimize(self.total_loss + entropy * ENTROPY_BETA,
                                                                    global_step=tf.train.get_global_step())
+        with tf.variable_scope('sess'):
+            self.sess = tf.Session()
+            self.sess.run(tf.global_variables_initializer())
 
     def update(self, s, s_, a, r, r_i, adv):
         if state_ftr == True:
             s = featurize_batch_state(s)
-
         self.sess.run(self.update_oldpi_op)
-
-        # update actor
         [self.sess.run(self.train_op, {self.s: s, self.tfa: a, self.tfadv: adv, self.tfdc_r: r, self.tfdc_r_i: r_i, self.s_: s_}) for _ in range(EPOCH)]
 
     def _build_anet(self, name, trainable):
         # tanh range = [-1,1]
         # softplus range = {0,inf}
         with tf.variable_scope(name):
-
-            #a_w = tf.zeros_initializer()
-            #a_w = tf.random_normal_initializer() # can't use random for actor, produces nan action
-            a_w = tf.glorot_uniform_initializer()
-            #a_w = tf.glorot_normal_initializer()
-
+            a_w = tf.glorot_uniform_initializer(seed=tf_operation_level_seed+3)
             mu = tf.layers.dense(self.s, A_DIM, tf.nn.tanh, kernel_initializer = a_w, name='mu', trainable=trainable)
             sigma = tf.layers.dense(self.s, A_DIM, tf.nn.softplus, kernel_initializer = a_w, name='sigma', trainable=trainable) + 1e-4
             norm_dist = tf.distributions.Normal(loc=mu, scale=sigma)
@@ -184,7 +172,29 @@ class PPO(object):
         tdlamret = np.vstack(adv) + V
         return tdlamret, adv # tdlamret is critic_target or Qs
 
-EP_MAX = 300
+# pre-train updating of s_ to running_stats_s_ object to prepare for normalization
+def state_next_normalize(sample_size, running_stats_s_):
+  buffer_s_ = []
+  s = env.reset()
+  for i in range(sample_size):
+    a = env.action_space.sample()
+    s_, r, done, _ = env.step(a)
+    buffer_s_.append(s_)
+
+  running_stats_s_.update(np.array(buffer_s_))
+
+# normalize & clip a running buffer
+# used on extrinsic reward (buffer_r), intrinsic reward (buffer_r_i) & next state(s_)
+def running_stats_fun(run_stats, buf, clip, clip_state):
+    run_stats.update(np.array(buf))
+    buf = (np.array(buf) - run_stats.mean) / run_stats.std
+    if clip_state == True:
+      buf = np.clip(buf, -clip, clip)
+    return buf
+
+start_time = time.time()
+
+EP_MAX = 200
 EP_LEN = 128
 
 sample_size = 10000
@@ -209,9 +219,17 @@ TL_LR = 0.0001 #0.001
 BATCH = 4 #4 10
 EPOCH = 4 #4 10
 epsilon = 0.1
-ENTROPY_BETA = 0.001
+ENTROPY_BETA = 0.001#0.001
 
-state_ftr = True
+num_hidden = 64
+
+np_random_seed = 1
+tf_graph_level_seed = np_random_seed + 1
+tf_operation_level_seed = tf_graph_level_seed + 1
+
+env = gym.make('MountainCarContinuous-v0')
+
+state_ftr = True # True False
 if state_ftr == True:
     S_DIM, next_S_DIM, A_DIM = n_comp*4, 2, 1 # MountainCarContinuous-v0, featurize s only
 else:
@@ -219,21 +237,24 @@ else:
 
 state_next_normal = True # normalize s_ for RND's target & predictor networks
 
-start_time = time.time()
+np.random.seed(np_random_seed)
 
-env = gym.make('MountainCarContinuous-v0')
+tf.reset_default_graph()
+tf.set_random_seed(tf_graph_level_seed) # called before session creation
+global_step = tf.Variable(0, name="global_step", trainable=False)
+rnd_ppo = RND_PPO(tf_operation_level_seed)
 
-# pre-train updating of s_ to running_stats_s_ object to get prepare for normalization
-def state_next_normalize(sample_size, running_stats_s_):
+all_steps = [] # stores number of episodic steps for display
+all_ep_r = [] # stores raw episodic rewards for display
+mv_all_ep_r = [] # store moving average episodic rewards for display
 
-  buffer_s_ = []
-  s = env.reset()
-  for i in range(sample_size):
-    a = env.action_space.sample()
-    s_, r, done, _ = env.step(a)
-    buffer_s_.append(s_)
+hit_counter = 0 # number of times flag reached by agent
 
-  running_stats_s_.update(np.array(buffer_s_))
+# normalization objects
+running_stats_s = RunningStats()
+running_stats_s_ = RunningStats()
+running_stats_r = RunningStats()
+running_stats_r_i = RunningStats()
 
 if state_ftr == True:
 # ----------
@@ -270,33 +291,6 @@ if state_ftr == True:
             fs_list.append(fs)
         return fs_list
 
-# normalize & clip a running buffer
-# used on extrinsic reward (buffer_r), intrinsic reward (buffer_r_i) & next state(s_)
-def running_stats_fun(run_stats, buf, clip, clip_state):
-    run_stats.update(np.array(buf))
-    buf = (np.array(buf) - run_stats.mean) / run_stats.std
-    if clip_state == True:
-      buf = np.clip(buf, -clip, clip)
-    return buf
-
-tf.reset_default_graph()
-sess = tf.Session()
-global_step = tf.Variable(0, name="global_step", trainable=False)
-ppo = PPO(sess)
-sess.run(tf.global_variables_initializer())
-
-all_steps = [] # stores number of episodic steps for display
-all_ep_r = [] # stores raw episodic rewards for display
-mv_all_ep_r = [] # store moving average episodic rewards for display
-
-hit_counter = 0 # number of times flag reached by agent
-
-# normalization objects
-running_stats_s = RunningStats()
-running_stats_s_ = RunningStats()
-running_stats_r = RunningStats()
-running_stats_r_i = RunningStats()
-
 if state_next_normal == True:
   state_next_normalize(sample_size, running_stats_s_)
 
@@ -305,9 +299,9 @@ for ep in range(EP_MAX):
     buffer_s, buffer_a, buffer_r, buffer_s_, buffer_done, buffer_V, buffer_V_i = [], [], [], [], [], [], []
     ep_r = 0
     steps = 0
-    for t in itertools.count():    # in one episode
+    for t in itertools.count(): # each rollout
         #env.render()
-        a = ppo.choose_action(s)
+        a = rnd_ppo.choose_action(s)
         s_, r, done, _ = env.step(a)
 
         buffer_s.append(s)
@@ -316,49 +310,41 @@ for ep in range(EP_MAX):
         buffer_s_.append(s_)
         buffer_done.append(done)
 
-        v = ppo.get_v(s)
+        v = rnd_ppo.get_v(s)
         buffer_V.append(v)
-        v_i = ppo.get_v_i(s)
+        v_i = rnd_ppo.get_v_i(s)
         buffer_V_i.append(v_i)
 
         s = s_
         ep_r += r
         steps += 1
 
-        # update ppo
         if (t+1) % BATCH == 0 or t == EP_LEN-1:
-
             buffer_s_ = running_stats_fun(running_stats_s_, buffer_s_, s_CLIP, True)
-
             if state_next_normal == True:
-                # Batch normalize of running s_ (next state)
                 buffer_s_ = running_stats_fun(running_stats_s_, buffer_s_, next_s_CLIP, True)
-
-            # compute batch r_i
-            buffer_r_i = ppo.intrinsic_r(buffer_s_)
-            # Batch normalize running extrinsic r
+            buffer_r_i = rnd_ppo.intrinsic_r(buffer_s_)
             buffer_r = running_stats_fun(running_stats_r, buffer_r, r_CLIP, True)
-            # Batch normalize running intrinsic r_i
             buffer_r_i = running_stats_fun(running_stats_r_i, buffer_r_i, r_CLIP, False)
 
-            v_s_ = ppo.get_v(s_)
-            tdlamret, adv = ppo.add_vtarg_and_adv(np.vstack(buffer_r),
-                                                  np.vstack(buffer_done),
-                                                  np.vstack(buffer_V),
-                                                  v_s_,
-                                                  GAMMA,
-                                                  lamda)
-            v_s_i = ppo.get_v_i(s_)
-            tdlamret_i, adv_i = ppo.add_vtarg_and_adv(np.vstack(buffer_r_i),
-                                                      np.vstack(buffer_done),
-                                                      np.vstack(buffer_V_i),
-                                                      v_s_i,
-                                                      GAMMA_i,
-                                                      lamda)
+            v_s_ = rnd_ppo.get_v(s_)
+            tdlamret, adv = rnd_ppo.add_vtarg_and_adv(np.vstack(buffer_r),
+                                                        np.vstack(buffer_done),
+                                                        np.vstack(buffer_V),
+                                                        v_s_,
+                                                        GAMMA,
+                                                        lamda)
+            v_s_i = rnd_ppo.get_v_i(s_)
+            tdlamret_i, adv_i = rnd_ppo.add_vtarg_and_adv(np.vstack(buffer_r_i),
+                                                            np.vstack(buffer_done),
+                                                            np.vstack(buffer_V_i),
+                                                            v_s_i,
+                                                            GAMMA_i,
+                                                            lamda)
 
-            bs, bs_, ba, br, br_i, b_adv = np.vstack(buffer_s), np.vstack(buffer_s_), np.vstack(buffer_a), tdlamret, tdlamret_i, np.vstack(adv + adv_i)
+            bs, bs_, ba, br, br_i, b_adv = np.vstack(buffer_s), np.vstack(buffer_s_), np.vstack(buffer_a), tdlamret, tdlamret_i, np.vstack(adv + adv_i) # sum advantages
             buffer_s, buffer_a, buffer_r, buffer_s_, buffer_done, buffer_V, buffer_V_i = [], [], [], [], [], [], []
-            ppo.update(bs, bs_, ba, br, br_i, b_adv)
+            rnd_ppo.update(bs, bs_, ba, br, br_i, b_adv)
 
         if done:
             print('done', ep, steps, ep_r)
