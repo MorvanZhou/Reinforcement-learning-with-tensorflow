@@ -31,7 +31,7 @@ class Maze(tk.Tk, object):
         self.n_actions = len(self.action_space)
         self.n_features = 2
         self.title('maze')
-        self.geometry('{0}x{1}'.format(MAZE_H * UNIT, MAZE_H * UNIT))
+        self.geometry('{0}x{1}'.format(MAZE_W * UNIT, MAZE_H * UNIT))
         self._build_maze()
 
     def _build_maze(self):
